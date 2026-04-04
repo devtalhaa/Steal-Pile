@@ -21,9 +21,12 @@ export class GameEngine {
   private turnOrder: string[] = [];
   private currentPlayerIndex: number = 0;
   private roundNumber: number = 1;
-  private netOwing: number = 0; // positive = B owes A
+  private netOwing: number = 0;
   private settings: RoomSettings;
   private lastAction?: GameAction;
+  private lastRoundResult?: RoundResult;
+  private teamAPile: Card[] = [];
+  private teamBPile: Card[] = [];
 
   constructor(playerInits: PlayerInit[], settings: RoomSettings) {
     this.settings = settings;
@@ -46,25 +49,40 @@ export class GameEngine {
 
   startRound(): void {
     this.deck = new Deck(this.settings.deckCount);
-    this.middleCards = [];
     this.phase = 'playing';
     this.currentPlayerIndex = 0;
     this.turnPhase = 'draw';
     this.lastAction = undefined;
+    this.lastRoundResult = undefined;
+    this.teamAPile = [];
+    this.teamBPile = [];
 
-    // Clear all players' hands and piles
     for (const player of this.players.values()) {
       player.hand = [];
       player.pile = [];
     }
 
-    // Deal 4 cards face-up to the middle
     this.middleCards = this.deck.draw(4);
 
-    // Deal 4 cards to each player
     for (const playerId of this.turnOrder) {
       const player = this.players.get(playerId)!;
       player.hand = this.deck.draw(4);
+    }
+
+    this.assertDeckIntegrity();
+  }
+
+  private getTeamPile(team: 'A' | 'B'): Card[] {
+    return team === 'A' ? this.teamAPile : this.teamBPile;
+  }
+
+  private assertDeckIntegrity(): void {
+    const playerHands = [...this.players.values()].map(p => p.hand);
+    if (this.settings.teamMode) {
+      this.deck.assertIntegrity(playerHands, this.middleCards, [this.teamAPile, this.teamBPile]);
+    } else {
+      const playerPiles = [...this.players.values()].map(p => p.pile);
+      this.deck.assertIntegrity(playerHands, this.middleCards, playerPiles);
     }
   }
 
@@ -79,7 +97,6 @@ export class GameEngine {
       return { success: false, error: 'Not in draw phase' };
     }
     if (this.deck.isEmpty()) {
-      // When deck is empty, skip draw and go straight to play
       this.turnPhase = this.turnPhase === 'draw' ? 'play' : 'bonus_play';
       return { success: false, error: 'Deck is empty, play a card from your hand' };
     }
@@ -95,6 +112,7 @@ export class GameEngine {
     };
 
     this.turnPhase = this.turnPhase === 'draw' ? 'play' : 'bonus_play';
+    this.assertDeckIntegrity();
     return { success: true };
   }
 
@@ -118,50 +136,50 @@ export class GameEngine {
     const card = player.hand.splice(cardIndex, 1)[0];
     const rank = card.rank;
 
-    // Find all matching middle cards
     const matchedMiddle = this.findMiddleMatches(rank);
-
-    // Find all opponent pile steal targets
     const stealTargets = this.findPileStealTargets(rank, playerId);
 
-    // Also check teammate piles in non-team mode (steal from anyone except yourself)
-    // In team mode, you can still steal from teammates if their pile top matches
-    // Actually, re-reading the rules - you steal from opponent piles only
-    // But let's keep it as: steal from anyone who isn't you
+    const myTeamPile = this.settings.teamMode && player.team
+      ? this.getTeamPile(player.team)
+      : player.pile;
+    const matchedSelf = myTeamPile.length > 0 && myTeamPile[myTeamPile.length - 1].rank === rank;
 
-    const hasMatch = matchedMiddle.length > 0 || stealTargets.length > 0;
+    const hasMatch = matchedMiddle.length > 0 || stealTargets.length > 0 || matchedSelf;
 
     if (hasMatch) {
-      // Remove matched cards from middle
       for (const mc of matchedMiddle) {
         const idx = this.middleCards.findIndex(c => c.id === mc.id);
         if (idx !== -1) this.middleCards.splice(idx, 1);
       }
 
-      // Remove stolen cards from opponent piles
+      // Remove stolen cards from the source pile (team pile in team mode, player pile in free-for-all)
       for (const target of stealTargets) {
-        const targetPlayer = this.players.get(target.fromPlayerId)!;
-        // Remove from top of pile (end of array)
-        targetPlayer.pile.splice(targetPlayer.pile.length - target.cards.length, target.cards.length);
-      }
-
-      // Add everything to player's pile: played card + matched middle + stolen cards
-      player.pile.push(card);
-      for (const mc of matchedMiddle) {
-        player.pile.push(mc);
-      }
-      for (const target of stealTargets) {
-        for (const sc of target.cards) {
-          player.pile.push(sc);
+        if (this.settings.teamMode && target.fromTeam) {
+          const src = this.getTeamPile(target.fromTeam);
+          src.splice(src.length - target.cards.length, target.cards.length);
+        } else if (target.fromPlayerId) {
+          const targetPlayer = this.players.get(target.fromPlayerId)!;
+          targetPlayer.pile.splice(targetPlayer.pile.length - target.cards.length, target.cards.length);
         }
       }
 
-      // Determine action type
+      // Push won cards to shared team pile (team mode) or individual pile (free-for-all)
+      const destPile = this.settings.teamMode && player.team
+        ? this.getTeamPile(player.team)
+        : player.pile;
+      destPile.push(card);
+      for (const mc of matchedMiddle) destPile.push(mc);
+      for (const target of stealTargets) {
+        for (const sc of target.cards) destPile.push(sc);
+      }
+
       let actionType: GameAction['type'] = 'match_middle';
       if (matchedMiddle.length > 0 && stealTargets.length > 0) {
         actionType = 'match_and_steal';
       } else if (stealTargets.length > 0) {
         actionType = 'steal_pile';
+      } else if (matchedMiddle.length === 0 && stealTargets.length === 0 && matchedSelf) {
+        actionType = 'match_own';
       }
 
       const action: GameAction = {
@@ -173,22 +191,20 @@ export class GameEngine {
       };
       this.lastAction = action;
 
-      // Check if deck is empty - if so, no bonus draw, turn ends
       if (this.deck.isEmpty()) {
         this.advanceTurn();
       } else {
-        // Bonus draw!
         this.turnPhase = 'bonus_draw';
       }
 
-      // Check round over
+      this.assertDeckIntegrity();
+
       if (this.checkRoundOver()) {
         this.handleRoundOver();
       }
 
       return { success: true, action };
     } else {
-      // No match - card goes to middle
       this.middleCards.push(card);
 
       const action: GameAction = {
@@ -199,8 +215,8 @@ export class GameEngine {
       this.lastAction = action;
 
       this.advanceTurn();
+      this.assertDeckIntegrity();
 
-      // Check round over
       if (this.checkRoundOver()) {
         this.handleRoundOver();
       }
@@ -214,17 +230,29 @@ export class GameEngine {
   }
 
   private findPileStealTargets(rank: Rank, excludePlayerId: string): StolenPileInfo[] {
-    const targets: StolenPileInfo[] = [];
+    const currentPlayer = this.players.get(excludePlayerId)!;
 
+    if (this.settings.teamMode && currentPlayer.team) {
+      const opponentTeam: 'A' | 'B' = currentPlayer.team === 'A' ? 'B' : 'A';
+      const opponentPile = this.getTeamPile(opponentTeam);
+
+      const stolen: Card[] = [];
+      for (let i = opponentPile.length - 1; i >= 0; i--) {
+        if (opponentPile[i].rank === rank) {
+          stolen.push(opponentPile[i]);
+        } else {
+          break;
+        }
+      }
+
+      return stolen.length > 0 ? [{ fromTeam: opponentTeam, cards: stolen }] : [];
+    }
+
+    const targets: StolenPileInfo[] = [];
     for (const [pid, player] of this.players) {
       if (pid === excludePlayerId || player.pile.length === 0) continue;
 
-      // In team mode, only steal from opponents (different team)
-      const currentPlayer = this.players.get(excludePlayerId)!;
-      if (this.settings.teamMode && player.team === currentPlayer.team) continue;
-
       const stolen: Card[] = [];
-      // Scan from top (end of array) downward for consecutive matching cards
       for (let i = player.pile.length - 1; i >= 0; i--) {
         if (player.pile[i].rank === rank) {
           stolen.push(player.pile[i]);
@@ -237,7 +265,6 @@ export class GameEngine {
         targets.push({ fromPlayerId: pid, cards: stolen });
       }
     }
-
     return targets;
   }
 
@@ -271,6 +298,7 @@ export class GameEngine {
   private handleRoundOver(): void {
     const scores = this.calculateScores();
     const result = this.calculateRoundResult(scores);
+    this.lastRoundResult = result;
 
     if (result.isGameOver) {
       this.phase = 'game_over';
@@ -291,6 +319,15 @@ export class GameEngine {
   }
 
   private calculateScores(): Record<string, number> {
+    if (this.settings.teamMode) {
+      const scores: Record<string, number> = {};
+      const teamAPoints = this.teamAPile.reduce((s, c) => s + this.getCardPoints(c), 0);
+      const teamBPoints = this.teamBPile.reduce((s, c) => s + this.getCardPoints(c), 0);
+      for (const [pid, player] of this.players) {
+        scores[pid] = player.team === 'A' ? teamAPoints : teamBPoints;
+      }
+      return scores;
+    }
     const scores: Record<string, number> = {};
     for (const [pid, player] of this.players) {
       let score = 0;
@@ -319,11 +356,12 @@ export class GameEngine {
         else if (player.team === 'B') teamScores.B += score;
       }
 
-      // Update owing: positive = B owes A
-      this.netOwing += (teamScores.A - teamScores.B);
+      const roundDiff = teamScores.A - teamScores.B;
+      this.netOwing += roundDiff;
 
       const isGameOver = Math.abs(this.netOwing) >= this.settings.targetScore;
       const winnerTeam = isGameOver ? (this.netOwing > 0 ? 'A' : 'B') : undefined;
+      const loserTeam = isGameOver ? (this.netOwing > 0 ? 'B' : 'A') : undefined;
 
       return {
         scores,
@@ -332,9 +370,9 @@ export class GameEngine {
         roundNumber: this.roundNumber,
         isGameOver,
         winnerTeam,
+        loserTeam,
       };
     } else {
-      // Solo mode - just find highest scorer
       let maxScore = -1;
       let winnerId = '';
       for (const [pid, score] of Object.entries(scores)) {
@@ -347,15 +385,17 @@ export class GameEngine {
       return {
         scores,
         roundNumber: this.roundNumber,
-        isGameOver: true, // Solo is always single round
+        isGameOver: true,
         winnerPlayerId: winnerId,
       };
     }
   }
 
   getRoundResult(): RoundResult {
-    const scores = this.calculateScores();
-    return this.calculateRoundResult(scores);
+    if (!this.lastRoundResult) {
+      throw new Error('getRoundResult called before round has ended — lastRoundResult is undefined');
+    }
+    return this.lastRoundResult;
   }
 
   getCurrentPlayerId(): string {
@@ -418,6 +458,14 @@ export class GameEngine {
       targetScore: this.settings.teamMode ? this.settings.targetScore : undefined,
       lastAction: this.lastAction,
       deckEmpty: this.deck.isEmpty(),
+      teamAPileTop: this.settings.teamMode
+        ? (this.teamAPile.length > 0 ? this.teamAPile[this.teamAPile.length - 1] : null)
+        : undefined,
+      teamAPileCount: this.settings.teamMode ? this.teamAPile.length : undefined,
+      teamBPileTop: this.settings.teamMode
+        ? (this.teamBPile.length > 0 ? this.teamBPile[this.teamBPile.length - 1] : null)
+        : undefined,
+      teamBPileCount: this.settings.teamMode ? this.teamBPile.length : undefined,
     };
   }
 

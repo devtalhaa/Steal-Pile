@@ -59,10 +59,14 @@ export interface ClientGameState {
   targetScore?: number;
   lastAction?: GameAction;
   deckEmpty: boolean;
+  teamAPileTop?: Card | null;
+  teamAPileCount?: number;
+  teamBPileTop?: Card | null;
+  teamBPileCount?: number;
 }
 
 export interface GameAction {
-  type: 'draw' | 'play_to_middle' | 'match_middle' | 'steal_pile' | 'match_and_steal' | 'round_over' | 'game_over';
+  type: 'draw' | 'play_to_middle' | 'match_middle' | 'steal_pile' | 'match_and_steal' | 'match_own' | 'round_over' | 'game_over';
   playerId: string;
   card?: Card;
   matchedMiddleCards?: Card[];
@@ -71,7 +75,8 @@ export interface GameAction {
 }
 
 export interface StolenPileInfo {
-  fromPlayerId: string;
+  fromPlayerId?: string;
+  fromTeam?: 'A' | 'B';
   cards: Card[];
 }
 
@@ -82,6 +87,7 @@ export interface RoundResult {
   roundNumber: number;
   isGameOver: boolean;
   winnerTeam?: 'A' | 'B';
+  loserTeam?: 'A' | 'B';
   winnerPlayerId?: string;
 }
 

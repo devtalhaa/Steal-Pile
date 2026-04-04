@@ -31,9 +31,11 @@ export function DrawPile({ count, isEmpty, isAutoDrawing }: DrawPileProps) {
         )}
 
         {isEmpty ? (
-          <div className="w-18 h-25 rounded-lg border-2 border-dashed border-gray-600
-            flex items-center justify-center">
-            <span className="text-gray-600 text-xs text-center">Deck<br />Empty</span>
+          <div className="relative">
+            <div className="card-size-md rounded-lg border-2 border-dashed border-gray-600 
+              flex items-center justify-center bg-gray-800 bg-opacity-30">
+              <span className="text-gray-500 text-xs text-center px-2">Empty</span>
+            </div>
           </div>
         ) : (
           <div className="relative">

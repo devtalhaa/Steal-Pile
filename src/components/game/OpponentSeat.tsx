@@ -18,7 +18,7 @@ export function OpponentSeat({ player, isCurrentTurn, pileHighlighted }: Opponen
   const teamColor = player.team ? TEAM_COLORS[player.team] : null;
 
   return (
-    <div className={`flex flex-col items-center gap-2 p-2 rounded-xl transition-all ${
+    <div className={`flex flex-col items-center gap-1.5 p-1.5 sm:gap-2 sm:p-2 rounded-xl transition-all max-h-[500px]:scale-90 max-h-[500px]:origin-top ${
       isCurrentTurn ? 'seat-active' : ''
     }`}
       style={{
@@ -28,7 +28,7 @@ export function OpponentSeat({ player, isCurrentTurn, pileHighlighted }: Opponen
         border: isCurrentTurn
           ? '1px solid rgba(255,215,0,0.3)'
           : '1px solid rgba(255,255,255,0.06)',
-        minWidth: 80,
+        minWidth: 'auto',
       }}>
 
       {/* Turn indicator ring */}
@@ -65,25 +65,16 @@ export function OpponentSeat({ player, isCurrentTurn, pileHighlighted }: Opponen
         )}
       </div>
 
-      {/* Hand (face-down) */}
-      <div className="flex gap-[-8px]">
-        {Array.from({ length: Math.min(player.handCount, 5) }).map((_, i) => (
-          <div key={i} style={{ marginLeft: i > 0 ? -12 : 0, zIndex: i }}>
-            <CardBack size="sm" />
-          </div>
-        ))}
-        {player.handCount === 0 && (
-          <span className="text-gray-600 text-xs">No cards</span>
-        )}
-      </div>
 
-      {/* Pile */}
-      <CardStack
-        topCard={player.pileTop}
-        count={player.pileCount}
-        size="sm"
-        isHighlighted={pileHighlighted}
-      />
+      {/* Pile (hide in team mode) */}
+      {!player.team && (
+        <CardStack
+          topCard={player.pileTop}
+          count={player.pileCount}
+          size="sm"
+          isHighlighted={pileHighlighted}
+        />
+      )}
 
       {/* Turn glow label */}
       {isCurrentTurn && (

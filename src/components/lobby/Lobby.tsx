@@ -78,7 +78,7 @@ export function Lobby({ code }: LobbyProps) {
       {/* Header */}
       <div className="text-center mb-8">
         <div className="text-5xl mb-2">🃏</div>
-        <h1 className="text-4xl font-bold gold-text mb-1" style={{ fontFamily: 'Georgia, serif' }}>KHOTI</h1>
+        <h1 className="text-4xl font-bold gold-text mb-1" style={{ letterSpacing: '0.05em' }}>KHOTI</h1>
         <p className="text-gray-400 text-sm">Game Lobby</p>
       </div>
 

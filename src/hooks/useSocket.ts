@@ -13,68 +13,48 @@ export function useSocket() {
   const setupListeners = useCallback(() => {
     const socket = getSocket();
 
-    socket.on('connect', () => {
+    const onConnect = () => {
       setConnected(true);
       setMyPlayer(socket.id!, useGameStore.getState().myPlayerName || 'Player');
-    });
+    };
+    const onDisconnect = () => setConnected(false);
+    const onRoomState = (room: any) => setRoom(room);
+    const onRoomError = (data: any) => setError(data.message);
+    const onGameState = (state: any) => setGameState(state);
+    const onGameAction = (action: any) => setPendingAction(action);
+    const onYourTurn = () => setMyTurn(true);
+    const onRoundOver = (result: any) => setRoundResult(result);
+    const onGameOver = (result: any) => setGameResult(result);
+    const onGameError = (data: any) => setError(data.message);
+    const onPlayerDisconnected = (data: any) => console.log(`${data.name} disconnected`);
+    const onPlayerReconnected = (data: any) => console.log(`${data.name} reconnected`);
 
-    socket.on('disconnect', () => {
-      setConnected(false);
-    });
-
-    socket.on('room:state', (room) => {
-      setRoom(room);
-    });
-
-    socket.on('room:error', (data) => {
-      setError(data.message);
-    });
-
-    socket.on('game:state', (state) => {
-      setGameState(state);
-    });
-
-    socket.on('game:action', (action) => {
-      setPendingAction(action);
-    });
-
-    socket.on('game:your-turn', () => {
-      setMyTurn(true);
-    });
-
-    socket.on('game:round-over', (result) => {
-      setRoundResult(result);
-    });
-
-    socket.on('game:over', (result) => {
-      setGameResult(result);
-    });
-
-    socket.on('game:error', (data) => {
-      setError(data.message);
-    });
-
-    socket.on('player:disconnected', (data) => {
-      console.log(`${data.name} disconnected`);
-    });
-
-    socket.on('player:reconnected', (data) => {
-      console.log(`${data.name} reconnected`);
-    });
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
+    socket.on('room:state', onRoomState);
+    socket.on('room:error', onRoomError);
+    socket.on('game:state', onGameState);
+    socket.on('game:action', onGameAction);
+    socket.on('game:your-turn', onYourTurn);
+    socket.on('game:round-over', onRoundOver);
+    socket.on('game:over', onGameOver);
+    socket.on('game:error', onGameError);
+    socket.on('player:disconnected', onPlayerDisconnected);
+    socket.on('player:reconnected', onPlayerReconnected);
 
     return () => {
-      socket.off('connect');
-      socket.off('disconnect');
-      socket.off('room:state');
-      socket.off('room:error');
-      socket.off('game:state');
-      socket.off('game:action');
-      socket.off('game:your-turn');
-      socket.off('game:round-over');
-      socket.off('game:over');
-      socket.off('game:error');
-      socket.off('player:disconnected');
-      socket.off('player:reconnected');
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
+      socket.off('room:state', onRoomState);
+      socket.off('room:error', onRoomError);
+      socket.off('game:state', onGameState);
+      socket.off('game:action', onGameAction);
+      socket.off('game:your-turn', onYourTurn);
+      socket.off('game:round-over', onRoundOver);
+      socket.off('game:over', onGameOver);
+      socket.off('game:error', onGameError);
+      socket.off('player:disconnected', onPlayerDisconnected);
+      socket.off('player:reconnected', onPlayerReconnected);
     };
   }, [setConnected, setMyPlayer, setRoom, setGameState, setMyTurn, setPendingAction, setRoundResult, setGameResult, setError]);
 

@@ -18,6 +18,7 @@ interface PlayerHandProps {
   onPlayCard: (cardId: string) => void;
   drawPileEmpty: boolean;
   isDrawing: boolean;
+  matchingRanks: string[];
 }
 
 export function PlayerHand({
@@ -32,6 +33,7 @@ export function PlayerHand({
   onPlayCard,
   drawPileEmpty,
   isDrawing,
+  matchingRanks,
 }: PlayerHandProps) {
 
   const handleDoubleClick = (card: Card) => {
@@ -58,36 +60,16 @@ export function PlayerHand({
   return (
     <div className="flex flex-col items-center gap-3">
 
-      {/* Player info bar */}
-      <div className="flex items-center gap-3 px-4 py-2 rounded-full"
-        style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.1)' }}>
-        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold
-          ${team === 'A' ? 'team-a' : team === 'B' ? 'team-b' : 'bg-gray-600 text-white'}`}>
-          {playerName.charAt(0).toUpperCase()}
-        </div>
-        <span className="font-semibold text-sm">{playerName}</span>
-        {team && (
-          <span className={`text-xs px-2 py-0.5 rounded font-bold ${team === 'A' ? 'team-a' : 'team-b'}`}>
-            Team {team}
-          </span>
-        )}
-        {isMyTurn && (
-          <motion.span
-            className="text-xs gold-text font-bold"
-            animate={{ opacity: [1, 0.4, 1] }}
-            transition={{ duration: 1, repeat: Infinity }}>
-            YOUR TURN
-          </motion.span>
-        )}
-      </div>
 
       <div className="flex items-end gap-6">
 
-        {/* My pile */}
-        <div className="flex flex-col items-center gap-1">
-          <span className="text-xs text-gray-400">Your Pile</span>
-          <CardStack topCard={pileTop} count={pileCount} size="md" isMyPile />
-        </div>
+        {/* My pile (only shown in free-for-all, team mode puts it in center) */}
+        {!team && (
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-xs text-gray-400">Your Pile</span>
+            <CardStack topCard={pileTop} count={pileCount} size="md" isMyPile />
+          </div>
+        )}
 
         {/* Hand area */}
         <div className="flex flex-col items-center gap-2">
@@ -116,45 +98,33 @@ export function PlayerHand({
             </AnimatePresence>
           </div>
 
-          {/* Fanned cards */}
-          <div className="relative flex items-end" style={{ minHeight: 140 }}>
+          {/* Flat horizontal hand without fanning */}
+          <div className="relative flex items-end justify-center gap-2 mt-4" style={{ minHeight: 140 }}>
             <AnimatePresence mode="popLayout">
               {hand.map((card, i) => {
-                const totalCards = hand.length;
-                const centerIndex = (totalCards - 1) / 2;
-                const offset = i - centerIndex;
-                const rotation = offset * 5;
-                const translateY = Math.abs(offset) * 3;
-                const translateX = offset * (totalCards > 4 ? 46 : 54);
-
                 return (
                   <motion.div
                     key={card.id}
+                    layoutId={card.id}
                     initial={{ scale: 0.5, y: 60, opacity: 0 }}
                     animate={{
                       scale: 1,
                       y: 0,
-                      opacity: 1,   // always full opacity — never dim your own cards
-                      rotate: rotation,
-                      translateY,
-                      translateX,
+                      opacity: 1,
+                      rotate: 0,
+                      translateY: 0,
+                      translateX: 0,
                     }}
                     exit={{ scale: 0.6, y: -30, opacity: 0 }}
                     transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-                    style={{
-                      position: 'absolute',
-                      left: '50%',
-                      bottom: 0,
-                      transformOrigin: 'bottom center',
-                      zIndex: i,
-                    }}
+                    style={{ zIndex: i }}
                     // Hover lift available whenever it's my turn (draw phase or play phase)
                     whileHover={isMyTurn ? { y: -14, scale: 1.06, zIndex: 30 } : {}}>
                     <PlayingCard
                       card={card}
                       size="lg"
-                      // playable glow only when actually able to throw
-                      playable={canPlay}
+                      // playable glow only when actually able to throw AND matches (unless absolutely nothing matches)
+                      playable={canPlay && (matchingRanks.length === 0 || matchingRanks.includes(card.rank))}
                       // NEVER disable own cards — just block double-click when not playable
                       disabled={false}
                       onDoubleClick={() => handleDoubleClick(card)}

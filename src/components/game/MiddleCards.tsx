@@ -25,6 +25,7 @@ export function MiddleCards({ cards, playableRank }: MiddleCardsProps) {
             {cards.map(card => (
               <motion.div
                 key={card.id}
+                layoutId={card.id}
                 initial={{ scale: 0, rotate: -10, opacity: 0 }}
                 animate={{ scale: 1, rotate: 0, opacity: 1 }}
                 exit={{ scale: 0, opacity: 0 }}

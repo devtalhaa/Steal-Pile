@@ -24,7 +24,7 @@ export function CardBack({ size = 'md', className = '', style, onClick, clickabl
       width={width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
-      className={`playing-card ${clickable ? 'cursor-pointer' : ''} ${className}`}
+      className={`playing-card card-size-${size} ${clickable ? 'cursor-pointer' : ''} ${className}`}
       onClick={onClick}
       style={style}>
 

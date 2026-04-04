@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Card } from '@/types/game';
+import { motion, AnimatePresence } from 'framer-motion';
 import { PlayingCard } from './PlayingCard';
 import { CardBack } from './CardBack';
 
@@ -66,15 +67,23 @@ export function CardStack({
         ))}
 
         {/* Top card (face-up) */}
-        {topCard && (
-          <div className="absolute" style={{ top: 0, left: 0, zIndex: offsetCount }}>
-            <PlayingCard
-              card={topCard}
-              size={size}
-              className={isHighlighted ? 'ring-2 ring-yellow-400' : ''}
-            />
-          </div>
-        )}
+        <AnimatePresence>
+          {topCard && (
+            <motion.div 
+              key={topCard.id}
+              layoutId={topCard.id}
+              className="absolute" 
+              style={{ top: 0, left: 0, zIndex: offsetCount }}
+              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+            >
+              <PlayingCard
+                card={topCard}
+                size={size}
+                className={isHighlighted ? 'ring-2 ring-yellow-400' : ''}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Glow for highlighted pile */}
         {isHighlighted && (

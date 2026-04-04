@@ -19,9 +19,10 @@ const io = new Server(httpServer, {
 const roomManager = new RoomManager();
 registerHandlers(io, roomManager);
 
-app.get('/health', (_req, res) => {
+app.get('/health', (_req: express.Request, res: express.Response) => {
   res.json({ status: 'ok' });
 });
+
 
 const PORT = process.env.PORT || 3001;
 httpServer.listen(Number(PORT), '0.0.0.0', () => {

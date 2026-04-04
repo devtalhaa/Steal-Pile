@@ -67,6 +67,7 @@ export function PlayingCard({
 
   const classNames = [
     'playing-card',
+    `card-size-${size}`,
     selected ? 'selected' : '',
     playable && !selected ? 'playable' : '',
     disabled ? 'disabled' : '',

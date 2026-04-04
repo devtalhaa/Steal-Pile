@@ -76,7 +76,7 @@ export default function Home() {
         {/* Logo/Header */}
         <div className="text-center mb-8">
           <div className="text-6xl mb-3 drop-shadow-lg">🃏</div>
-          <h1 className="text-5xl font-bold gold-text mb-1" style={{ fontFamily: 'Georgia, serif', letterSpacing: '0.1em' }}>
+          <h1 className="text-5xl font-bold gold-text mb-1" style={{ letterSpacing: '0.1em' }}>
             KHOTI
           </h1>
           <p className="text-gray-400 text-xs tracking-widest uppercase mb-3">Pakistani Card Game Online</p>
@@ -106,12 +106,12 @@ export default function Home() {
 
           {/* Tabs */}
           <div className="flex mb-6 rounded-lg overflow-hidden" style={{ background: 'rgba(0,0,0,0.3)' }}>
-            <button
+            <button suppressHydrationWarning
               onClick={() => { setTab('create'); setError(null); }}
               className={`flex-1 py-3 font-semibold text-sm transition-all ${tab === 'create' ? 'btn-gold' : 'btn-ghost'}`}>
               ✦ Create Room
             </button>
-            <button
+            <button suppressHydrationWarning
               onClick={() => { setTab('join'); setError(null); }}
               className={`flex-1 py-3 font-semibold text-sm transition-all ${tab === 'join' ? 'btn-gold' : 'btn-ghost'}`}>
               ✦ Join Room
@@ -121,7 +121,7 @@ export default function Home() {
           {/* Player name (shared) */}
           <div className="mb-4">
             <label className="block text-xs text-gray-400 mb-1 uppercase tracking-wider">Your Name</label>
-            <input
+            <input suppressHydrationWarning
               className="casino-input"
               placeholder="Enter your name"
               value={playerName}
@@ -141,7 +141,7 @@ export default function Home() {
                 </label>
                 <div className="grid grid-cols-7 gap-1">
                   {[2, 3, 4, 5, 6, 7, 8].map(n => (
-                    <button key={n}
+                    <button suppressHydrationWarning key={n}
                       onClick={() => setSettings(s => ({ ...s, maxPlayers: n }))}
                       className={`py-2 rounded text-sm font-bold transition-all ${
                         settings.maxPlayers === n ? 'btn-gold' : 'btn-ghost'
@@ -157,7 +157,7 @@ export default function Home() {
                 <label className="block text-xs text-gray-400 mb-2 uppercase tracking-wider">Deck</label>
                 <div className="flex gap-2">
                   {([1, 2] as const).map(n => (
-                    <button key={n}
+                    <button suppressHydrationWarning key={n}
                       onClick={() => setSettings(s => ({ ...s, deckCount: n }))}
                       className={`flex-1 py-2 rounded text-sm font-semibold transition-all ${
                         settings.deckCount === n ? 'btn-gold' : 'btn-ghost'
@@ -174,7 +174,7 @@ export default function Home() {
                   <div className="text-sm font-medium">Team Mode</div>
                   <div className="text-xs text-gray-500">Requires even number of players</div>
                 </div>
-                <button
+                <button suppressHydrationWarning
                   onClick={() => setSettings(s => ({ ...s, teamMode: !s.teamMode }))}
                   className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors ${
                     settings.teamMode ? 'bg-green-600' : 'bg-gray-700'
@@ -191,7 +191,7 @@ export default function Home() {
                   <label className="block text-xs text-gray-400 mb-1 uppercase tracking-wider">
                     Owing Target Score
                   </label>
-                  <input
+                  <input suppressHydrationWarning
                     type="number"
                     className="casino-input"
                     value={settings.targetScore}
@@ -211,7 +211,7 @@ export default function Home() {
                 </div>
               )}
 
-              <button onClick={handleCreate} disabled={loading || !isConnected} className="btn-gold w-full text-base py-3">
+              <button suppressHydrationWarning onClick={handleCreate} disabled={loading || !isConnected} className="btn-gold w-full text-base py-3">
                 {loading ? 'Creating Room...' : 'Create Room →'}
               </button>
             </div>
@@ -219,7 +219,7 @@ export default function Home() {
             <div className="space-y-4">
               <div>
                 <label className="block text-xs text-gray-400 mb-1 uppercase tracking-wider">4-Digit Room Code</label>
-                <input
+                <input suppressHydrationWarning
                   className="casino-input text-center text-3xl tracking-[0.4em] font-mono font-bold"
                   placeholder="0000"
                   value={joinCode}
@@ -235,7 +235,7 @@ export default function Home() {
                 </div>
               )}
 
-              <button
+              <button suppressHydrationWarning
                 onClick={handleJoin}
                 disabled={loading || !isConnected || joinCode.length !== 4 || !playerName.trim()}
                 className="btn-gold w-full text-base py-3">

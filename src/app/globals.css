@@ -27,7 +27,7 @@ button {
 body {
   background: #0a0a0a;
   color: #f0f0f0;
-  font-family: 'Georgia', serif;
+  font-family: var(--font-poppins), sans-serif;
   min-height: 100vh;
   overflow-x: hidden;
   /* Enable momentum scrolling on iOS */
@@ -219,3 +219,379 @@ body {
 
 .team-a { background: #1d4ed8; color: white; }
 .team-b { background: #b91c1c; color: white; }
+
+.portrait-prompt {
+  display: none;
+}
+
+@media (max-width: 1024px) and (orientation: portrait) {
+  .portrait-prompt {
+    display: flex !important;
+  }
+}
+
+.card-size-md {
+  width: 72px;
+  height: 100px;
+}
+
+.card-size-lg {
+  width: 90px;
+  height: 126px;
+}
+
+@media (max-width: 1024px) {
+  .card-size-md {
+    width: 52px !important;
+    height: 72px !important;
+  }
+  .card-size-lg {
+    width: 64px !important;
+    height: 90px !important;
+  }
+}
+
+@media (max-height: 500px) {
+  .card-size-md {
+    width: 46px !important;
+    height: 64px !important;
+  }
+}
+
+/* ============================================================
+   TEAM ZONE VIEW — Vertical Layout
+   Zones: Opponent Pile → Play Area → My Pile → My Hand
+   ============================================================ */
+
+.team-zone-root {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  gap: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── Zone section shell ── */
+.zone-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  transition: background 0.2s;
+}
+
+.zone-opponent {
+  background: rgba(185, 28, 28, 0.08);
+  border-top: 2px solid rgba(220, 38, 38, 0.25);
+  flex: 0 0 auto;
+}
+
+.zone-play-area {
+  background: rgba(0, 0, 0, 0.35);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(212, 168, 67, 0.2);
+  border-top: 1px solid rgba(212, 168, 67, 0.2);
+}
+
+.zone-my-pile {
+  background: rgba(22, 163, 74, 0.08);
+  border-top: 2px solid rgba(34, 197, 94, 0.25);
+  flex: 0 0 auto;
+}
+
+.zone-my-hand {
+  background: rgba(15, 23, 42, 0.85);
+  border-top: 2px solid rgba(212, 168, 67, 0.35);
+  flex: 0 0 auto;
+  padding-bottom: 14px;
+}
+
+/* ── Zone headers ── */
+.zone-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.zone-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.zone-label-opponent {
+  color: #fca5a5;
+}
+
+.zone-label-mine {
+  color: #86efac;
+}
+
+.zone-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* ── Counters ── */
+.zone-counter {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 2px 10px;
+  white-space: nowrap;
+}
+
+.zone-counter strong {
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.zone-counter-opponent {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+}
+
+.zone-counter-opponent strong {
+  color: #fecaca;
+}
+
+.zone-counter-mine {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+}
+
+.zone-counter-mine strong {
+  color: #bbf7d0;
+}
+
+.draw-pile-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: rgba(212, 168, 67, 0.85);
+  background: rgba(212, 168, 67, 0.1);
+  border: 1px solid rgba(212, 168, 67, 0.25);
+  border-radius: 20px;
+  padding: 2px 10px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.draw-pile-badge strong {
+  font-weight: 700;
+  color: #fde68a;
+}
+
+.draw-pile-icon {
+  font-size: 12px;
+}
+
+/* ── Zone bodies ── */
+.zone-body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.zone-body::-webkit-scrollbar {
+  display: none;
+}
+
+.zone-body-play {
+  min-height: 90px;
+  align-items: center;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.zone-body-hand {
+  justify-content: center;
+  padding: 6px 0 2px;
+}
+
+/* ── Empty state ── */
+.zone-empty-slot {
+  width: 52px;
+  height: 72px;
+  border: 2px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.zone-empty-text {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.25);
+  text-align: center;
+}
+
+.zone-play-empty {
+  width: 100%;
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.2);
+  font-size: 12px;
+  font-style: italic;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+/* ── Stacked pile (overlapping) ── */
+.stacked-pile-wrapper {
+  position: relative;
+  width: 52px;
+  height: 74px;
+  flex-shrink: 0;
+}
+
+.stacked-card-layer {
+  position: absolute;
+  pointer-events: none;
+}
+
+.stacked-top-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* ── Spread row (play area / hand) ── */
+.spread-zone-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 4px 2px;
+}
+
+.spread-card-item {
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+/* ── Pile top-card preview text ── */
+.pile-top-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin-left: 6px;
+}
+
+.pile-preview-label {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.pile-preview-card {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: Georgia, serif;
+  line-height: 1;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+}
+
+/* ── Your turn badge ── */
+.your-turn-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #fde68a;
+  background: rgba(234, 179, 8, 0.15);
+  border: 1px solid rgba(234, 179, 8, 0.4);
+  border-radius: 20px;
+  padding: 2px 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-left: auto;
+}
+
+/* ── Integrity badge ── */
+.zone-integrity-badge {
+  position: absolute;
+  bottom: 4px;
+  right: 8px;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.12);
+  pointer-events: none;
+  letter-spacing: 0.04em;
+}
+
+/* ── Stacked pile group (pile visual + metadata below) ── */
+.stacked-pile-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.pile-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.pile-player-label {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pile-count-text {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* ── Responsive: tighter on mobile ── */
+@media (max-width: 640px) {
+  .zone-section {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .stacked-pile-wrapper {
+    width: 42px;
+    height: 60px;
+  }
+
+  .zone-play-empty {
+    height: 72px;
+  }
+
+  .zone-body-play {
+    min-height: 72px;
+  }
+}
+

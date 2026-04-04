@@ -6,13 +6,24 @@ import { useGameStore } from '@/store/gameStore';
 import { RoomSettings } from '@/types/game';
 
 export function useGameActions() {
-  const { setMyPlayer, setMyTurn, setError } = useGameStore();
+  const { setMyPlayer, setMyTurn, setError, setRoom, setGameState, setGameResult, setRoundResult } = useGameStore();
+
+  const clearStaleGameData = useCallback(() => {
+    setRoom(null);
+    setGameState(null as any); // We can safely assume state is null here for reset purposes although type might complain if we don't cast or use union. Wait! 
+    // Wait, ClientGameState | null is the correct type.
+    setGameState(null as any); 
+    setGameResult(null);
+    setRoundResult(null);
+    setError(null);
+  }, [setRoom, setGameState, setGameResult, setRoundResult, setError]);
 
   const createRoom = useCallback((playerName: string, settings: RoomSettings): Promise<string> => {
     return new Promise((resolve, reject) => {
+      clearStaleGameData();
       const socket = getSocket();
       setMyPlayer(socket.id!, playerName);
-      socket.emit('room:create', { playerName, settings }, (res) => {
+      socket.emit('room:create', { playerName, settings }, (res: any) => {
         if (res.ok) {
           resolve(res.code);
         } else {
@@ -20,13 +31,14 @@ export function useGameActions() {
         }
       });
     });
-  }, [setMyPlayer]);
+  }, [clearStaleGameData, setMyPlayer]);
 
   const joinRoom = useCallback((code: string, playerName: string): Promise<void> => {
     return new Promise((resolve, reject) => {
+      clearStaleGameData();
       const socket = getSocket();
       setMyPlayer(socket.id!, playerName);
-      socket.emit('room:join', { code, playerName }, (res) => {
+      socket.emit('room:join', { code, playerName }, (res: any) => {
         if (res.ok) {
           resolve();
         } else {
@@ -34,7 +46,7 @@ export function useGameActions() {
         }
       });
     });
-  }, [setMyPlayer]);
+  }, [clearStaleGameData, setMyPlayer]);
 
   const updateSettings = useCallback((settings: Partial<RoomSettings>) => {
     const socket = getSocket();
@@ -49,7 +61,7 @@ export function useGameActions() {
   const startGame = useCallback((): Promise<void> => {
     return new Promise((resolve, reject) => {
       const socket = getSocket();
-      socket.emit('room:start', (res) => {
+      socket.emit('room:start', (res: any) => {
         if (res.ok) {
           resolve();
         } else {
@@ -60,9 +72,10 @@ export function useGameActions() {
   }, []);
 
   const leaveRoom = useCallback(() => {
+    clearStaleGameData();
     const socket = getSocket();
     socket.emit('room:leave');
-  }, []);
+  }, [clearStaleGameData]);
 
   const drawCard = useCallback(() => {
     const socket = getSocket();
