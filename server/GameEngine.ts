@@ -482,4 +482,19 @@ export class GameEngine {
   getPlayerIds(): string[] {
     return [...this.turnOrder];
   }
+
+  replacePlayerId(oldId: string, newId: string): boolean {
+    const player = this.players.get(oldId);
+    if (!player) return false;
+
+    player.id = newId;
+    player.isConnected = true;
+    this.players.delete(oldId);
+    this.players.set(newId, player);
+
+    const turnIdx = this.turnOrder.indexOf(oldId);
+    if (turnIdx !== -1) this.turnOrder[turnIdx] = newId;
+
+    return true;
+  }
 }

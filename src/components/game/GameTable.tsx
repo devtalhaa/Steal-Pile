@@ -9,6 +9,7 @@ import { DrawPile } from './DrawPile';
 import { OpponentSeat } from './OpponentSeat';
 import { PlayerHand } from './PlayerHand';
 import { ScoreBoard } from './ScoreBoard';
+import { TurnTimer } from './TurnTimer';
 import { CardStack } from '@/components/cards/CardStack';
 
 interface GameTableProps {
@@ -228,11 +229,13 @@ export function GameTable({ myPlayerId }: GameTableProps) {
                 top: `${pos.y}%`,
                 transform: 'translate(-50%, -50%)',
               }}>
-              <OpponentSeat
-                player={opponent}
-                isCurrentTurn={currentPlayerId === opponent.id}
-                pileHighlighted={canPlay && (isTeamMode ? oppTeamPileTop !== null : opponent.pileTop !== null)}
-              />
+              <div className="max-lg:mt-6 transition-all duration-300">
+                <OpponentSeat
+                  player={opponent}
+                  isCurrentTurn={currentPlayerId === opponent.id}
+                  pileHighlighted={canPlay && (isTeamMode ? oppTeamPileTop !== null : opponent.pileTop !== null)}
+                />
+              </div>
             </div>
           );
         })}
@@ -249,9 +252,22 @@ export function GameTable({ myPlayerId }: GameTableProps) {
           gap: 15, // slightly more gap
           width: '100%',
         }}>
-        <MiddleCards cards={middleCards} />
+        <div className="relative flex justify-center items-center">
+          <MiddleCards cards={middleCards} />
+          
+          {/* Mobile Draw Pile (Hidden on Laptop) */}
+          <div className="absolute left-full ml-4 lg:hidden pointer-events-auto">
+            <DrawPile
+              count={drawPileCount}
+              canDraw={false}
+              isEmpty={deckEmpty}
+              onDraw={() => {}}
+              isAutoDrawing={isDrawing && isCurrentPlayerMe}
+            />
+          </div>
+        </div>
         
-        <div className="flex items-end justify-center gap-8 pointer-events-auto">
+        <div className="flex items-end justify-center gap-8 lg:gap-12 pointer-events-auto mt-2">
           {isTeamMode && (
             <div className="flex flex-col items-center gap-1">
               <span className={`text-[10px] font-bold uppercase tracking-wider ${myTeam === 'A' ? 'text-green-400' : 'text-gray-400'}`}>
@@ -266,13 +282,15 @@ export function GameTable({ myPlayerId }: GameTableProps) {
             </div>
           )}
 
-          <DrawPile
-            count={drawPileCount}
-            canDraw={false}        // drawing is now fully automatic
-            isEmpty={deckEmpty}
-            onDraw={() => {}}
-            isAutoDrawing={isDrawing && isCurrentPlayerMe}
-          />
+          <div className="hidden lg:block">
+            <DrawPile
+              count={drawPileCount}
+              canDraw={false}        // drawing is now fully automatic
+              isEmpty={deckEmpty}
+              onDraw={() => {}}
+              isAutoDrawing={isDrawing && isCurrentPlayerMe}
+            />
+          </div>
 
           {isTeamMode && (
             <div className="flex flex-col items-center gap-1">
@@ -345,6 +363,12 @@ export function GameTable({ myPlayerId }: GameTableProps) {
                 YOUR TURN
               </motion.span>
             )}
+            <TurnTimer
+              isMyTurn={isCurrentPlayerMe}
+              currentPlayerId={currentPlayerId}
+              roundNumber={gameState.roundNumber}
+              turnPhase={turnPhase}
+            />
           </div>
         )}
         <ScoreBoard gameState={gameState} myPlayerId={myPlayerId} />
@@ -389,12 +413,18 @@ export function GameTable({ myPlayerId }: GameTableProps) {
       {/* Waiting indicator — when it's someone else's turn */}
       {!isCurrentPlayerMe && (
         <div className="absolute top-1/2 right-3 -translate-y-1/2 z-20">
-          <div className="px-3 py-2 rounded-xl text-xs text-center"
+          <div className="px-3 py-2 rounded-xl text-xs text-center flex flex-col items-center gap-1.5"
             style={{
               background: 'rgba(0,0,0,0.65)',
               border: '1px solid rgba(212,168,67,0.2)',
             }}>
-            <div className="gold-text font-bold mb-0.5">WAITING</div>
+            <TurnTimer
+              isMyTurn={false}
+              currentPlayerId={currentPlayerId}
+              roundNumber={gameState.roundNumber}
+              turnPhase={turnPhase}
+            />
+            <div className="gold-text font-bold">WAITING</div>
             <div className="text-gray-400 truncate max-w-20">
               {players.find(p => p.id === currentPlayerId)?.name}
             </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useCallback } from 'react';
-import { connectSocket, getSocket, disconnectSocket } from '@/lib/socket';
+import { connectSocket, getSocket } from '@/lib/socket';
 import { useGameStore } from '@/store/gameStore';
 
 export function useSocket() {
@@ -15,7 +15,30 @@ export function useSocket() {
 
     const onConnect = () => {
       setConnected(true);
-      setMyPlayer(socket.id!, useGameStore.getState().myPlayerName || 'Player');
+      const storedName = useGameStore.getState().myPlayerName || 'Player';
+      setMyPlayer(socket.id!, storedName);
+
+      const sessionCode = typeof window !== 'undefined' ? sessionStorage.getItem('khoti_room_code') : null;
+      const sessionName = typeof window !== 'undefined' ? sessionStorage.getItem('khoti_player_name') : null;
+
+      if (sessionCode && sessionName) {
+        socket.emit('game:reconnect', { code: sessionCode, playerName: sessionName }, (res: any) => {
+          if (res.ok) {
+            setMyPlayer(socket.id!, sessionName);
+            if (res.room) setRoom(res.room);
+            if (res.gameState) {
+              setGameState(res.gameState);
+              if (res.gameState.phase === 'playing') {
+                setRoundResult(null);
+                setGameResult(null);
+              }
+            }
+          } else {
+            sessionStorage.removeItem('khoti_room_code');
+            sessionStorage.removeItem('khoti_player_name');
+          }
+        });
+      }
     };
     const onDisconnect = () => setConnected(false);
     const onRoomState = (room: any) => setRoom(room);
@@ -66,7 +89,6 @@ export function useSocket() {
 
   useEffect(() => {
     const socket = connectSocket();
-    // Update id once connected
     if (socket.connected) {
       setConnected(true);
       setMyPlayer(socket.id!, useGameStore.getState().myPlayerName || 'Player');
@@ -74,6 +96,19 @@ export function useSocket() {
     const cleanup = setupListeners();
     return cleanup;
   }, [setupListeners, setConnected, setMyPlayer]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        const socket = getSocket();
+        if (!socket.connected) {
+          socket.connect();
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
 
   return getSocket();
 }

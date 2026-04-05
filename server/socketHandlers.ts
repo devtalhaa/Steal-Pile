@@ -2,6 +2,91 @@ import { Server, Socket } from 'socket.io';
 import { RoomManager } from './RoomManager';
 import { RoomSettings } from './types';
 
+const roomTimers = new Map<string, NodeJS.Timeout>();
+
+function stopTurnTimer(roomCode: string) {
+  const existingTimer = roomTimers.get(roomCode);
+  if (existingTimer) {
+    clearTimeout(existingTimer);
+    roomTimers.delete(roomCode);
+  }
+}
+
+function resetTurnTimer(io: Server, roomManager: RoomManager, roomCode: string) {
+  stopTurnTimer(roomCode);
+  const timer = setTimeout(() => {
+    handleTurnTimeout(io, roomManager, roomCode);
+  }, 20000);
+  roomTimers.set(roomCode, timer);
+}
+
+function handleTurnTimeout(io: Server, roomManager: RoomManager, roomCode: string) {
+  const room = roomManager.getRoomByCode(roomCode);
+  if (!room || !room.gameEngine) return;
+
+  const engine = room.gameEngine;
+  if (engine.getPhase() !== 'playing') return;
+
+  const currentPlayerId = engine.getCurrentPlayerId();
+  const turnPhase = engine.getTurnPhase();
+  
+  let delayBeforePlay = 0;
+
+  if (turnPhase === 'draw' || turnPhase === 'bonus_draw') {
+    if (!engine.getClientState(currentPlayerId).deckEmpty) {
+      const res = engine.drawCard(currentPlayerId);
+      if (res.success) {
+        broadcastGameState(io, room);
+        delayBeforePlay = 500;
+      }
+    }
+  }
+
+  setTimeout(() => {
+    if (!room.gameEngine || room.gameEngine.getPhase() !== 'playing') return;
+    if (room.gameEngine.getCurrentPlayerId() !== currentPlayerId) return;
+
+    const currentPhase = room.gameEngine.getTurnPhase();
+    if (currentPhase !== 'play' && currentPhase !== 'bonus_play') return;
+
+    const state = room.gameEngine.getClientState(currentPlayerId);
+    const hand = state.myHand;
+    
+    if (hand.length > 0) {
+      const randomIdx = Math.floor(Math.random() * hand.length);
+      const cardToPlay = hand[randomIdx];
+
+      const playRes = room.gameEngine.playCard(currentPlayerId, cardToPlay.id);
+      if (playRes.success) {
+        if (playRes.action) {
+          io.to(roomCode).emit('game:action', playRes.action);
+        }
+
+        setTimeout(() => {
+          if (!room.gameEngine) return;
+          const phase = room.gameEngine.getPhase();
+          
+          if (phase === 'round_over') {
+            stopTurnTimer(roomCode);
+            io.to(roomCode).emit('game:round-over', room.gameEngine.getRoundResult());
+          } else if (phase === 'game_over') {
+            stopTurnTimer(roomCode);
+            io.to(roomCode).emit('game:over', room.gameEngine.getRoundResult());
+          }
+
+          broadcastGameState(io, room);
+
+          if (phase === 'playing') {
+            const nextPlayer = room.gameEngine.getCurrentPlayerId();
+            io.to(nextPlayer).emit('game:your-turn');
+            resetTurnTimer(io, roomManager, roomCode);
+          }
+        }, 100);
+      }
+    }
+  }, delayBeforePlay);
+}
+
 export function registerHandlers(io: Server, roomManager: RoomManager): void {
   io.on('connection', (socket: Socket) => {
     console.log(`Player connected: ${socket.id}`);
@@ -86,9 +171,9 @@ export function registerHandlers(io: Server, roomManager: RoomManager): void {
         io.to(pid).emit('game:state', state);
       }
 
-      // Notify first player it's their turn
       const firstPlayer = room.gameEngine.getCurrentPlayerId();
       io.to(firstPlayer).emit('game:your-turn');
+      resetTurnTimer(io, roomManager, code);
     });
 
     socket.on('room:leave', () => {
@@ -139,20 +224,21 @@ export function registerHandlers(io: Server, roomManager: RoomManager): void {
         const phase = room.gameEngine.getPhase();
 
         if (phase === 'round_over') {
+          stopTurnTimer(room.code);
           const roundResult = room.gameEngine.getRoundResult();
           io.to(room.code).emit('game:round-over', roundResult);
         } else if (phase === 'game_over') {
+          stopTurnTimer(room.code);
           const roundResult = room.gameEngine.getRoundResult();
           io.to(room.code).emit('game:over', roundResult);
         }
 
-        // Send updated game state to each player
         broadcastGameState(io, room);
 
-        // Notify next player if game is still playing
         if (phase === 'playing') {
           const currentPlayer = room.gameEngine.getCurrentPlayerId();
           io.to(currentPlayer).emit('game:your-turn');
+          resetTurnTimer(io, roomManager, room.code);
         }
       }, 100);
     });
@@ -161,7 +247,6 @@ export function registerHandlers(io: Server, roomManager: RoomManager): void {
       const room = roomManager.getRoomByPlayerId(socket.id);
       if (!room || !room.gameEngine) return;
 
-      // Only host can trigger next round
       if (room.hostId !== socket.id) return;
 
       room.gameEngine.nextRound();
@@ -169,13 +254,66 @@ export function registerHandlers(io: Server, roomManager: RoomManager): void {
 
       const currentPlayer = room.gameEngine.getCurrentPlayerId();
       io.to(currentPlayer).emit('game:your-turn');
+      resetTurnTimer(io, roomManager, room.code);
     });
 
-    // ============ DISCONNECT ============
+    socket.on('game:reconnect', (data: { code: string; playerName: string }, callback) => {
+      try {
+        const result = roomManager.reconnectPlayer(data.code, data.playerName, socket.id);
+        if (!result.success) {
+          callback({ ok: false, error: result.error || 'Cannot reconnect' });
+          return;
+        }
+
+        socket.join(data.code);
+
+        const roomState = roomManager.getRoomState(data.code);
+        if (roomState) {
+          io.to(data.code).emit('room:state', roomState);
+        }
+
+        const room = roomManager.getRoomByCode(data.code);
+        if (room && room.gameEngine) {
+          const gameState = room.gameEngine.getClientState(socket.id);
+          callback({ ok: true, room: roomState, gameState });
+
+          io.to(data.code).emit('player:reconnected', {
+            id: socket.id,
+            name: data.playerName,
+          });
+
+          broadcastGameState(io, room);
+
+          if (room.gameEngine.getPhase() === 'playing' && room.gameEngine.getCurrentPlayerId() === socket.id) {
+            io.to(socket.id).emit('game:your-turn');
+            resetTurnTimer(io, roomManager, data.code);
+          }
+        } else {
+          callback({ ok: true, room: roomState });
+        }
+      } catch (err) {
+        callback({ ok: false, error: 'Reconnect failed' });
+      }
+    });
 
     socket.on('disconnect', () => {
       console.log(`Player disconnected: ${socket.id}`);
-      handleLeave(socket, io, roomManager);
+      const result = roomManager.disconnectPlayer(socket.id);
+      if (!result) return;
+
+      if (result.wasInGame) {
+        const room = roomManager.getRoomByCode(result.code);
+        if (room && room.gameEngine) {
+          io.to(result.code).emit('player:disconnected', {
+            id: socket.id,
+            name: 'Player',
+          });
+          broadcastGameState(io, room);
+        }
+      } else {
+        const roomState = roomManager.getRoomState(result.code);
+        if (roomState) io.to(result.code).emit('room:state', roomState);
+      }
     });
   });
 }
@@ -184,16 +322,17 @@ function handleLeave(socket: Socket, io: Server, roomManager: RoomManager): void
   const result = roomManager.leaveRoom(socket.id);
   if (!result) return;
 
-  const { code, isEmpty, newHostId } = result;
+  const { code, isEmpty } = result;
   socket.leave(code);
 
-  if (isEmpty) return;
+  if (isEmpty) {
+    stopTurnTimer(code);
+    return;
+  }
 
-  // Notify remaining players
   const roomState = roomManager.getRoomState(code);
   if (roomState) io.to(code).emit('room:state', roomState);
 
-  // Also broadcast game state if game is in progress
   const room = roomManager.getRoomByCode(code);
   if (room && room.gameEngine) {
     io.to(code).emit('player:disconnected', {
