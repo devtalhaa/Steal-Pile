@@ -20,7 +20,13 @@ export function useSocket() {
     const onDisconnect = () => setConnected(false);
     const onRoomState = (room: any) => setRoom(room);
     const onRoomError = (data: any) => setError(data.message);
-    const onGameState = (state: any) => setGameState(state);
+    const onGameState = (state: any) => {
+      setGameState(state);
+      if (state.phase === 'playing') {
+        setRoundResult(null);
+        setGameResult(null);
+      }
+    };
     const onGameAction = (action: any) => setPendingAction(action);
     const onYourTurn = () => setMyTurn(true);
     const onRoundOver = (result: any) => setRoundResult(result);

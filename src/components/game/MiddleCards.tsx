@@ -15,8 +15,8 @@ export function MiddleCards({ cards, playableRank }: MiddleCardsProps) {
     <div className="flex flex-col items-center gap-2">
       <div className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Middle</div>
 
-      <div className="flex flex-wrap gap-2 justify-center items-center min-h-[84px] min-w-[200px]
-        rounded-xl p-3"
+      <div className="flex flex-wrap gap-1 sm:gap-2 justify-center items-center min-h-[60px] min-w-[140px] sm:min-h-[84px] sm:min-w-[200px]
+        rounded-xl p-1.5 sm:p-3"
         style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)' }}>
         {cards.length === 0 ? (
           <span className="text-gray-600 text-sm italic">No cards</span>
@@ -24,15 +24,16 @@ export function MiddleCards({ cards, playableRank }: MiddleCardsProps) {
           <AnimatePresence mode="popLayout">
             {cards.map(card => (
               <motion.div
+                layout
                 key={card.id}
                 layoutId={card.id}
-                initial={{ scale: 0, rotate: -10, opacity: 0 }}
-                animate={{ scale: 1, rotate: 0, opacity: 1 }}
-                exit={{ scale: 0, opacity: 0 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 20 }}>
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.65, ease: [0.4, 0, 0.2, 1] }}>
                 <PlayingCard
                   card={card}
-                  size="md"
+                  size="sm"
                   className={playableRank === card.rank ? 'ring-2 ring-yellow-400' : ''}
                 />
               </motion.div>

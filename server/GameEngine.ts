@@ -371,6 +371,10 @@ export class GameEngine {
         isGameOver,
         winnerTeam,
         loserTeam,
+        teamPiles: {
+          A: [...this.teamAPile],
+          B: [...this.teamBPile],
+        },
       };
     } else {
       let maxScore = -1;
@@ -382,11 +386,17 @@ export class GameEngine {
         }
       }
 
+      const playerPiles: Record<string, Card[]> = {};
+      for (const [pid, player] of this.players) {
+        playerPiles[pid] = [...player.pile];
+      }
+
       return {
         scores,
         roundNumber: this.roundNumber,
         isGameOver: true,
         winnerPlayerId: winnerId,
+        playerPiles,
       };
     }
   }

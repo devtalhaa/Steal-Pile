@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useSocket } from '@/hooks/useSocket';
 import { useGameActions } from '@/hooks/useGameActions';
 import { useGameStore } from '@/store/gameStore';
+import { useSettingsStore, CardBackStyle } from '@/store/settingsStore';
 import { connectSocket } from '@/lib/socket';
 import { RoomSettings } from '@/types/game';
+import { CardBack } from '@/components/cards/CardBack';
 
 const DEFAULT_SETTINGS: RoomSettings = {
   deckCount: 1,
@@ -15,6 +17,14 @@ const DEFAULT_SETTINGS: RoomSettings = {
   maxPlayers: 4,
 };
 
+function FloatingCard({ suit, style }: { suit: string; style: React.CSSProperties }) {
+  return (
+    <div className="absolute pointer-events-none select-none" style={{ ...style, fontSize: 40, opacity: 0.06 }}>
+      {suit}
+    </div>
+  );
+}
+
 export default function Home() {
   const router = useRouter();
   useSocket();
@@ -22,8 +32,11 @@ export default function Home() {
   const isConnected = useGameStore(s => s.isConnected);
   const error = useGameStore(s => s.error);
   const setError = useGameStore(s => s.setError);
+  
+  const storedStyle = useSettingsStore(s => s.cardBack);
+  const setCardBack = useSettingsStore(s => s.setCardBack);
 
-  const [tab, setTab] = useState<'create' | 'join'>('create');
+  const [mode, setMode] = useState<'menu' | 'create' | 'join' | 'settings'>('menu');
   const [playerName, setPlayerName] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [settings, setSettings] = useState<RoomSettings>(DEFAULT_SETTINGS);
@@ -61,193 +74,227 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-x-hidden overflow-y-auto py-8"
-      style={{ background: 'radial-gradient(ellipse at center, #0d1117 0%, #000 100%)' }}>
+    <div className="lobby-root">
+      <div className="lobby-bg-layer" />
 
-      {/* Decorative background glow */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0 }}>
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full opacity-10"
-          style={{ background: 'radial-gradient(circle, #d4a843, transparent)', filter: 'blur(80px)' }} />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full opacity-8"
-          style={{ background: 'radial-gradient(circle, #0d5016, transparent)', filter: 'blur(80px)' }} />
-      </div>
+      <FloatingCard suit="♠" style={{ top: '8%', left: '5%', transform: 'rotate(-15deg)' }} />
+      <FloatingCard suit="♥" style={{ top: '15%', right: '8%', transform: 'rotate(20deg)' }} />
+      <FloatingCard suit="♣" style={{ bottom: '20%', left: '10%', transform: 'rotate(10deg)' }} />
+      <FloatingCard suit="♦" style={{ bottom: '12%', right: '6%', transform: 'rotate(-22deg)' }} />
+      <FloatingCard suit="🃏" style={{ top: '45%', left: '3%', transform: 'rotate(35deg)' }} />
+      <FloatingCard suit="♠" style={{ top: '60%', right: '4%', transform: 'rotate(-10deg)' }} />
 
-      <div className="relative z-10 w-full max-w-md px-4">
-        {/* Logo/Header */}
-        <div className="text-center mb-8">
-          <div className="text-6xl mb-3 drop-shadow-lg">🃏</div>
-          <h1 className="text-5xl font-bold gold-text mb-1" style={{ letterSpacing: '0.1em' }}>
-            KHOTI
-          </h1>
-          <p className="text-gray-400 text-xs tracking-widest uppercase mb-3">Pakistani Card Game Online</p>
-          <div className="flex justify-center gap-4 text-2xl">
-            <span className="text-gray-200">♠</span>
-            <span style={{ color: '#DC2626' }}>♥</span>
-            <span className="text-gray-200">♣</span>
-            <span style={{ color: '#DC2626' }}>♦</span>
+      <div className="lobby-content">
+        <div className="lobby-logo-area">
+          <div className="lobby-card-icon">
+            <span>🃏</span>
+          </div>
+          <h1 className="lobby-title">KHOTI</h1>
+          <p className="lobby-subtitle">STEAL · MATCH · WIN</p>
+          <div className="lobby-suits">
+            <span style={{ color: '#e8e8e8' }}>♠</span>
+            <span style={{ color: '#ef4444' }}>♥</span>
+            <span style={{ color: '#e8e8e8' }}>♣</span>
+            <span style={{ color: '#ef4444' }}>♦</span>
           </div>
         </div>
 
-        {/* Connection indicator */}
-        <div className="flex items-center justify-center gap-2 mb-6">
-          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-yellow-500'} transition-colors`}
-            style={{ boxShadow: isConnected ? '0 0 6px #22c55e' : '0 0 6px #eab308' }} />
-          <span className="text-xs text-gray-400">{isConnected ? 'Server Connected' : 'Connecting to server...'}</span>
+        <div className="lobby-status">
+          <div className={`lobby-status-dot ${isConnected ? 'online' : 'offline'}`} />
+          <span>{isConnected ? 'Online' : 'Connecting...'}</span>
         </div>
 
-        {/* Main panel */}
-        <div className="rounded-2xl p-6"
-          style={{
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(212,168,67,0.2)',
-            backdropFilter: 'blur(10px)',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.5)'
-          }}>
+        {mode === 'menu' && (
+          <div className="lobby-menu-buttons">
+            <div className="lobby-name-input-wrap">
+              <input
+                suppressHydrationWarning
+                className="lobby-name-input"
+                placeholder="Your Name"
+                value={playerName}
+                onChange={e => setPlayerName(e.target.value)}
+                maxLength={20}
+                autoFocus
+              />
+            </div>
 
-          {/* Tabs */}
-          <div className="flex mb-6 rounded-lg overflow-hidden" style={{ background: 'rgba(0,0,0,0.3)' }}>
-            <button suppressHydrationWarning
-              onClick={() => { setTab('create'); setError(null); }}
-              className={`flex-1 py-3 font-semibold text-sm transition-all ${tab === 'create' ? 'btn-gold' : 'btn-ghost'}`}>
-              ✦ Create Room
+            <button
+              suppressHydrationWarning
+              className="lobby-btn lobby-btn-primary"
+              onClick={() => { setError(null); setMode('create'); }}
+              disabled={!isConnected}>
+              <span className="lobby-btn-icon">⚔️</span>
+              <div className="lobby-btn-text">
+                <span className="lobby-btn-label">Create Room</span>
+                <span className="lobby-btn-desc">Host a new game</span>
+              </div>
             </button>
-            <button suppressHydrationWarning
-              onClick={() => { setTab('join'); setError(null); }}
-              className={`flex-1 py-3 font-semibold text-sm transition-all ${tab === 'join' ? 'btn-gold' : 'btn-ghost'}`}>
-              ✦ Join Room
+
+            <button
+              suppressHydrationWarning
+              className="lobby-btn lobby-btn-secondary"
+              onClick={() => { setError(null); setMode('join'); }}
+              disabled={!isConnected}>
+              <span className="lobby-btn-icon">🎯</span>
+              <div className="lobby-btn-text">
+                <span className="lobby-btn-label">Join Room</span>
+                <span className="lobby-btn-desc">Enter a room code</span>
+              </div>
+            </button>
+
+            <button
+              suppressHydrationWarning
+              className="lobby-btn lobby-btn-secondary"
+              style={{ padding: '12px 20px' }}
+              onClick={() => { setError(null); setMode('settings'); }}>
+              <span className="lobby-btn-icon" style={{ fontSize: '20px' }}>⚙️</span>
+              <div className="lobby-btn-text">
+                <span className="lobby-btn-label">Settings</span>
+                <span className="lobby-btn-desc">Customize your game</span>
+              </div>
             </button>
           </div>
+        )}
 
-          {/* Player name (shared) */}
-          <div className="mb-4">
-            <label className="block text-xs text-gray-400 mb-1 uppercase tracking-wider">Your Name</label>
-            <input suppressHydrationWarning
-              className="casino-input"
-              placeholder="Enter your name"
-              value={playerName}
-              onChange={e => setPlayerName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && (tab === 'join' ? handleJoin() : handleCreate())}
-              maxLength={20}
-              autoFocus
-            />
+        {mode === 'settings' && (
+          <div className="lobby-panel">
+            <div className="lobby-panel-header">
+              <button className="lobby-back-btn" onClick={() => { setMode('menu'); setError(null); }}>←</button>
+              <h2 className="lobby-panel-title">Settings</h2>
+            </div>
+
+            <div className="lobby-setting-group">
+              <label className="lobby-setting-label">Card Back Design</label>
+              <p className="text-xs text-white/50 mb-3 leading-tight">Choose the back side of cards that you will see during the game.</p>
+              
+              <div className="grid grid-cols-2 flex-wrap gap-4 justify-items-center mt-2">
+                {(['classic-blue', 'crimson-ruby', 'midnight-dragon', 'emerald-forest'] as CardBackStyle[]).map(styleId => (
+                  <div key={styleId} className="flex flex-col items-center gap-2 w-full">
+                    <div 
+                      className={`rounded-xl p-3 cursor-pointer transition-all w-full flex justify-center ${
+                        storedStyle === styleId ? 'bg-white/10 ring-2 ring-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.3)]' : 'bg-white/5 hover:bg-white/10'
+                      }`}
+                      onClick={() => setCardBack(styleId)}>
+                      <CardBack forceStyle={styleId} size="lg" clickable={false} />
+                    </div>
+                    <span className="text-[10px] uppercase tracking-wider text-white/70 font-semibold text-center">
+                      {styleId.split('-').join(' ')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
+        )}
 
-          {tab === 'create' ? (
-            <div className="space-y-4">
-              {/* Max players */}
+        {mode === 'create' && (
+          <div className="lobby-panel">
+            <div className="lobby-panel-header">
+              <button className="lobby-back-btn" onClick={() => { setMode('menu'); setError(null); }}>←</button>
+              <h2 className="lobby-panel-title">Create Room</h2>
+            </div>
+
+            <div className="lobby-setting-group">
+              <label className="lobby-setting-label">Players</label>
+              <div className="lobby-player-grid">
+                {[2, 3, 4, 5, 6, 7, 8].map(n => (
+                  <button suppressHydrationWarning key={n}
+                    onClick={() => setSettings(s => ({ ...s, maxPlayers: n }))}
+                    className={`lobby-player-btn ${settings.maxPlayers === n ? 'active' : ''}`}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="lobby-setting-group">
+              <label className="lobby-setting-label">Deck</label>
+              <div className="lobby-deck-row">
+                {([1, 2] as const).map(n => (
+                  <button suppressHydrationWarning key={n}
+                    onClick={() => setSettings(s => ({ ...s, deckCount: n }))}
+                    className={`lobby-deck-btn ${settings.deckCount === n ? 'active' : ''}`}>
+                    {n === 1 ? '1 Deck' : '2 Decks'}
+                    <span className="lobby-deck-count">{n === 1 ? '52 cards' : '104 cards'}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="lobby-toggle-row">
               <div>
-                <label className="block text-xs text-gray-400 mb-2 uppercase tracking-wider">
-                  Players: <span className="gold-text font-bold">{settings.maxPlayers}</span>
-                </label>
-                <div className="grid grid-cols-7 gap-1">
-                  {[2, 3, 4, 5, 6, 7, 8].map(n => (
-                    <button suppressHydrationWarning key={n}
-                      onClick={() => setSettings(s => ({ ...s, maxPlayers: n }))}
-                      className={`py-2 rounded text-sm font-bold transition-all ${
-                        settings.maxPlayers === n ? 'btn-gold' : 'btn-ghost'
-                      }`}>
-                      {n}
-                    </button>
-                  ))}
-                </div>
+                <div className="lobby-toggle-label">Team Mode</div>
+                <div className="lobby-toggle-hint">2v2 / 3v3 / 4v4</div>
               </div>
-
-              {/* Deck */}
-              <div>
-                <label className="block text-xs text-gray-400 mb-2 uppercase tracking-wider">Deck</label>
-                <div className="flex gap-2">
-                  {([1, 2] as const).map(n => (
-                    <button suppressHydrationWarning key={n}
-                      onClick={() => setSettings(s => ({ ...s, deckCount: n }))}
-                      className={`flex-1 py-2 rounded text-sm font-semibold transition-all ${
-                        settings.deckCount === n ? 'btn-gold' : 'btn-ghost'
-                      }`}>
-                      {n === 1 ? '1 Deck (52)' : '2 Decks (104)'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Team mode toggle */}
-              <div className="flex items-center justify-between py-2">
-                <div>
-                  <div className="text-sm font-medium">Team Mode</div>
-                  <div className="text-xs text-gray-500">Requires even number of players</div>
-                </div>
-                <button suppressHydrationWarning
-                  onClick={() => setSettings(s => ({ ...s, teamMode: !s.teamMode }))}
-                  className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors ${
-                    settings.teamMode ? 'bg-green-600' : 'bg-gray-700'
-                  }`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                    settings.teamMode ? 'translate-x-7' : 'translate-x-1'
-                  }`} />
-                </button>
-              </div>
-
-              {/* Target score */}
-              {settings.teamMode && (
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1 uppercase tracking-wider">
-                    Owing Target Score
-                  </label>
-                  <input suppressHydrationWarning
-                    type="number"
-                    className="casino-input"
-                    value={settings.targetScore}
-                    onChange={e => setSettings(s => ({ ...s, targetScore: Math.max(10, Number(e.target.value)) }))}
-                    min={10}
-                    max={200}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Game ends when net owing difference reaches this limit
-                  </p>
-                </div>
-              )}
-
-              {error && (
-                <div className="bg-red-900/30 border border-red-500/30 rounded-lg p-3 text-red-400 text-sm text-center">
-                  {error}
-                </div>
-              )}
-
-              <button suppressHydrationWarning onClick={handleCreate} disabled={loading || !isConnected} className="btn-gold w-full text-base py-3">
-                {loading ? 'Creating Room...' : 'Create Room →'}
+              <button suppressHydrationWarning
+                onClick={() => setSettings(s => ({ ...s, teamMode: !s.teamMode }))}
+                className={`lobby-toggle ${settings.teamMode ? 'on' : ''}`}>
+                <span className="lobby-toggle-knob" />
               </button>
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs text-gray-400 mb-1 uppercase tracking-wider">4-Digit Room Code</label>
+
+            {settings.teamMode && (
+              <div className="lobby-setting-group">
+                <label className="lobby-setting-label">Target Score</label>
                 <input suppressHydrationWarning
-                  className="casino-input text-center text-3xl tracking-[0.4em] font-mono font-bold"
-                  placeholder="0000"
-                  value={joinCode}
-                  onChange={e => setJoinCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                  onKeyDown={e => e.key === 'Enter' && handleJoin()}
-                  maxLength={4}
+                  type="number"
+                  className="lobby-code-input"
+                  value={settings.targetScore}
+                  onChange={e => setSettings(s => ({ ...s, targetScore: Math.max(10, Number(e.target.value)) }))}
+                  min={10}
+                  max={200}
                 />
               </div>
+            )}
 
-              {error && (
-                <div className="bg-red-900/30 border border-red-500/30 rounded-lg p-3 text-red-400 text-sm text-center">
-                  {error}
-                </div>
-              )}
+            {error && <div className="lobby-error">{error}</div>}
 
-              <button suppressHydrationWarning
-                onClick={handleJoin}
-                disabled={loading || !isConnected || joinCode.length !== 4 || !playerName.trim()}
-                className="btn-gold w-full text-base py-3">
-                {loading ? 'Joining...' : 'Join Game →'}
-              </button>
+            <button suppressHydrationWarning onClick={handleCreate} disabled={loading || !isConnected || !playerName.trim()} className="lobby-btn lobby-btn-primary lobby-btn-full">
+              <span className="lobby-btn-icon">🚀</span>
+              <div className="lobby-btn-text">
+                <span className="lobby-btn-label">{loading ? 'Creating...' : 'Start Room'}</span>
+              </div>
+            </button>
+          </div>
+        )}
+
+        {mode === 'join' && (
+          <div className="lobby-panel">
+            <div className="lobby-panel-header">
+              <button className="lobby-back-btn" onClick={() => { setMode('menu'); setError(null); }}>←</button>
+              <h2 className="lobby-panel-title">Join Room</h2>
             </div>
-          )}
-        </div>
 
-        <p className="text-center text-gray-600 text-xs mt-6">
-          Share your 4-digit code with friends • Up to 8 players
-        </p>
+            <div className="lobby-setting-group">
+              <label className="lobby-setting-label">Room Code</label>
+              <input suppressHydrationWarning
+                className="lobby-code-input"
+                placeholder="0000"
+                value={joinCode}
+                onChange={e => setJoinCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                onKeyDown={e => e.key === 'Enter' && handleJoin()}
+                maxLength={4}
+                autoFocus
+              />
+            </div>
+
+            {error && <div className="lobby-error">{error}</div>}
+
+            <button suppressHydrationWarning
+              onClick={handleJoin}
+              disabled={loading || !isConnected || joinCode.length !== 4 || !playerName.trim()}
+              className="lobby-btn lobby-btn-primary lobby-btn-full">
+              <span className="lobby-btn-icon">🎮</span>
+              <div className="lobby-btn-text">
+                <span className="lobby-btn-label">{loading ? 'Joining...' : 'Join Game'}</span>
+              </div>
+            </button>
+          </div>
+        )}
+
+        <div className="lobby-footer">
+          Share your 4-digit code with friends
+        </div>
       </div>
     </div>
   );

@@ -89,6 +89,8 @@ export interface RoundResult {
   winnerTeam?: 'A' | 'B';
   loserTeam?: 'A' | 'B';
   winnerPlayerId?: string;
+  playerPiles?: Record<string, Card[]>;
+  teamPiles?: { A: Card[]; B: Card[] };
 }
 
 // Server-only types

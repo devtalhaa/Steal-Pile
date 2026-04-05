@@ -98,25 +98,25 @@ export function PlayerHand({
             </AnimatePresence>
           </div>
 
-          {/* Flat horizontal hand without fanning */}
-          <div className="relative flex items-end justify-center gap-2 mt-4" style={{ minHeight: 140 }}>
+          {/* Squeezed hand with negative margins to overlap cards on mobile */}
+          <div className="relative flex items-end justify-center mt-2 sm:mt-4" style={{ minHeight: 120 }}>
             <AnimatePresence mode="popLayout">
               {hand.map((card, i) => {
+                const overlapClass = i > 0 ? '-ml-8 sm:-ml-6 lg:-ml-2' : '';
                 return (
                   <motion.div
+                    layout
                     key={card.id}
+                    className={overlapClass}
                     layoutId={card.id}
-                    initial={{ scale: 0.5, y: 60, opacity: 0 }}
+                    initial={{ scale: 0.85, opacity: 0 }}
                     animate={{
                       scale: 1,
                       y: 0,
                       opacity: 1,
-                      rotate: 0,
-                      translateY: 0,
-                      translateX: 0,
                     }}
-                    exit={{ scale: 0.6, y: -30, opacity: 0 }}
-                    transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.65, ease: [0.4, 0, 0.2, 1] }}
                     style={{ zIndex: i }}
                     // Hover lift available whenever it's my turn (draw phase or play phase)
                     whileHover={isMyTurn ? { y: -14, scale: 1.06, zIndex: 30 } : {}}>
@@ -141,12 +141,6 @@ export function PlayerHand({
         </div>
       </div>
 
-      {/* Subtle hint below hand */}
-      {canPlay && hand.length > 0 && (
-        <div className="text-[11px] text-gray-500">
-          Double-click any card to play it
-        </div>
-      )}
     </div>
   );
 }
