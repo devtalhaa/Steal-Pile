@@ -127,4 +127,8 @@ export interface ClientToServerEvents {
   'game:draw': () => void;
   'game:play-card': (data: { cardId: string }) => void;
   'game:next-round': () => void;
+  'game:reconnect': (
+    data: { code: string; playerName: string },
+    callback: (res: { ok: true; room: RoomState; gameState?: ClientGameState } | { ok: false; error: string }) => void
+  ) => void;
 }

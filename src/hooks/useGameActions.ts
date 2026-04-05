@@ -25,6 +25,8 @@ export function useGameActions() {
       setMyPlayer(socket.id!, playerName);
       socket.emit('room:create', { playerName, settings }, (res: any) => {
         if (res.ok) {
+          sessionStorage.setItem('khoti_room_code', res.code);
+          sessionStorage.setItem('khoti_player_name', playerName);
           resolve(res.code);
         } else {
           reject(new Error(res.error));
@@ -40,6 +42,8 @@ export function useGameActions() {
       setMyPlayer(socket.id!, playerName);
       socket.emit('room:join', { code, playerName }, (res: any) => {
         if (res.ok) {
+          sessionStorage.setItem('khoti_room_code', code);
+          sessionStorage.setItem('khoti_player_name', playerName);
           resolve();
         } else {
           reject(new Error(res.error));
@@ -73,6 +77,8 @@ export function useGameActions() {
 
   const leaveRoom = useCallback(() => {
     clearStaleGameData();
+    sessionStorage.removeItem('khoti_room_code');
+    sessionStorage.removeItem('khoti_player_name');
     const socket = getSocket();
     socket.emit('room:leave');
   }, [clearStaleGameData]);

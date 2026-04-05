@@ -59,7 +59,6 @@ export class RoomManager {
       return { code, isEmpty: true };
     }
 
-    // Transfer host if needed
     let newHostId: string | undefined;
     if (room.hostId === playerId) {
       newHostId = room.players.keys().next().value!;
@@ -67,6 +66,54 @@ export class RoomManager {
     }
 
     return { code, isEmpty: false, newHostId };
+  }
+
+  disconnectPlayer(playerId: string): { code: string; wasInGame: boolean } | null {
+    const code = this.playerToRoom.get(playerId);
+    if (!code) return null;
+
+    const room = this.rooms.get(code);
+    if (!room) return null;
+
+    if (room.status === 'in_game' && room.gameEngine) {
+      room.gameEngine.setPlayerConnected(playerId, false);
+      return { code, wasInGame: true };
+    }
+
+    return this.leaveRoom(playerId) ? { code, wasInGame: false } : null;
+  }
+
+  reconnectPlayer(code: string, playerName: string, newSocketId: string): { success: boolean; oldId?: string; error?: string } {
+    const room = this.rooms.get(code);
+    if (!room) return { success: false, error: 'Room not found' };
+
+    let oldId: string | undefined;
+    for (const [pid, p] of room.players) {
+      if (p.name === playerName) {
+        oldId = pid;
+        break;
+      }
+    }
+
+    if (!oldId) return { success: false, error: 'Player not found in room' };
+    if (oldId === newSocketId) return { success: true, oldId };
+
+    const playerData = room.players.get(oldId)!;
+    room.players.delete(oldId);
+    room.players.set(newSocketId, playerData);
+
+    this.playerToRoom.delete(oldId);
+    this.playerToRoom.set(newSocketId, code);
+
+    if (room.hostId === oldId) {
+      room.hostId = newSocketId;
+    }
+
+    if (room.gameEngine) {
+      room.gameEngine.replacePlayerId(oldId, newSocketId);
+    }
+
+    return { success: true, oldId };
   }
 
   updateSettings(code: string, playerId: string, settings: Partial<RoomSettings>): boolean {
