@@ -70,11 +70,15 @@ export function CardStack({
         <AnimatePresence>
           {topCard && (
             <motion.div 
+              layout
               key={topCard.id}
               layoutId={topCard.id}
               className="absolute" 
               style={{ top: 0, left: 0, zIndex: offsetCount }}
-              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.65, ease: [0.4, 0, 0.2, 1] }}
             >
               <PlayingCard
                 card={topCard}

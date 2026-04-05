@@ -49,7 +49,7 @@ export default function GamePage({ params }: { params: Promise<{ code: string }>
   }
 
   return (
-    <div className="h-screen overflow-hidden relative">
+    <div className="h-screen overflow-hidden relative" style={{ touchAction: 'none' }}>
       <GameTable myPlayerId={myPlayerId!} />
       {(roundResult || gameResult) && (
         <GameOverModal />

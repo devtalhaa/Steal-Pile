@@ -22,24 +22,24 @@ function getTablePositions(totalPlayers: number, myIndex: number) {
     const offset = ((i - myIndex + totalPlayers) % totalPlayers);
 
     if (offset === 0) {
-      positions.push({ x: 50, y: 88 }); // Bottom (You)
+      positions.push({ x: 50, y: 92 }); // Bottom (You)
     } else if (totalPlayers === 2) {
-      positions.push({ x: 50, y: 15 }); // Top
+      positions.push({ x: 50, y: 10 }); // Top
     } else if (totalPlayers === 3) {
-      if (offset === 1) positions.push({ x: 15, y: 40 }); // Top-Left
-      if (offset === 2) positions.push({ x: 85, y: 40 }); // Top-Right
+      if (offset === 1) positions.push({ x: 8, y: 35 }); // Top-Left
+      if (offset === 2) positions.push({ x: 92, y: 35 }); // Top-Right
     } else if (totalPlayers === 4) {
-      if (offset === 1) positions.push({ x: 12, y: 45 }); // Left
-      if (offset === 2) positions.push({ x: 50, y: 12 }); // Top
-      if (offset === 3) positions.push({ x: 88, y: 45 }); // Right
+      if (offset === 1) positions.push({ x: 6, y: 40 }); // Left
+      if (offset === 2) positions.push({ x: 50, y: 8 }); // Top
+      if (offset === 3) positions.push({ x: 94, y: 40 }); // Right
     } else {
       // Fallback for >4 players
       const opponentsCount = totalPlayers - 1;
       const angleStep = 180 / (opponentsCount + 1);
       const angleDeg = (offset * angleStep);
       const radians = (angleDeg + 180) * (Math.PI / 180); // Start from left, go over top, to right
-      const x = 50 + 40 * Math.cos(radians);
-      const y = 50 + 35 * Math.sin(radians);
+      const x = 50 + 44 * Math.cos(radians);
+      const y = 50 + 42 * Math.sin(radians);
       positions.push({ x, y });
     }
   }
@@ -189,9 +189,9 @@ export function GameTable({ myPlayerId }: GameTableProps) {
         <div
           className="table-edge"
           style={{
-            width: '85vw',
-            maxWidth: 900,
-            height: '70vh',
+            width: '95vw',
+            maxWidth: 1000,
+            height: '80vh',
             maxHeight: 540,
             borderRadius: '50%',
             background: 'radial-gradient(ellipse at 50% 40%, #166534 0%, #0d5016 50%, #052e0a 100%)',
@@ -322,7 +322,8 @@ export function GameTable({ myPlayerId }: GameTableProps) {
       </AnimatePresence>
 
       {/* Top left info: Player badge & Score board */}
-      <div className="absolute top-3 left-3 z-20 flex flex-col gap-2 pointer-events-auto">
+      <div className="absolute z-20 flex flex-col gap-2 pointer-events-auto"
+        style={{ top: 'max(env(safe-area-inset-top), 12px)', left: 'max(env(safe-area-inset-left), 12px)' }}>
         {myPlayer && (
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full w-fit"
             style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.1)' }}>
@@ -351,8 +352,10 @@ export function GameTable({ myPlayerId }: GameTableProps) {
 
       {/* Deck-empty badge — top right */}
       {deckEmpty && (
-        <div className="absolute top-3 right-3 z-20 px-3 py-1.5 rounded-xl text-xs font-bold"
+        <div className="absolute z-20 px-3 py-1.5 rounded-xl text-xs font-bold"
           style={{
+            top: 'max(env(safe-area-inset-top), 12px)',
+            right: 'max(env(safe-area-inset-right), 12px)',
             background: 'rgba(127,29,29,0.85)',
             border: '1px solid rgba(239,68,68,0.4)',
             color: '#fca5a5',
