@@ -2,90 +2,6 @@ import { Server, Socket } from 'socket.io';
 import { RoomManager } from './RoomManager';
 import { RoomSettings } from './types';
 
-const roomTimers = new Map<string, NodeJS.Timeout>();
-
-function stopTurnTimer(roomCode: string) {
-  const existingTimer = roomTimers.get(roomCode);
-  if (existingTimer) {
-    clearTimeout(existingTimer);
-    roomTimers.delete(roomCode);
-  }
-}
-
-function resetTurnTimer(io: Server, roomManager: RoomManager, roomCode: string) {
-  stopTurnTimer(roomCode);
-  const timer = setTimeout(() => {
-    handleTurnTimeout(io, roomManager, roomCode);
-  }, 20000);
-  roomTimers.set(roomCode, timer);
-}
-
-function handleTurnTimeout(io: Server, roomManager: RoomManager, roomCode: string) {
-  const room = roomManager.getRoomByCode(roomCode);
-  if (!room || !room.gameEngine) return;
-
-  const engine = room.gameEngine;
-  if (engine.getPhase() !== 'playing') return;
-
-  const currentPlayerId = engine.getCurrentPlayerId();
-  const turnPhase = engine.getTurnPhase();
-  
-  let delayBeforePlay = 0;
-
-  if (turnPhase === 'draw' || turnPhase === 'bonus_draw') {
-    if (!engine.getClientState(currentPlayerId).deckEmpty) {
-      const res = engine.drawCard(currentPlayerId);
-      if (res.success) {
-        broadcastGameState(io, room);
-        delayBeforePlay = 500;
-      }
-    }
-  }
-
-  setTimeout(() => {
-    if (!room.gameEngine || room.gameEngine.getPhase() !== 'playing') return;
-    if (room.gameEngine.getCurrentPlayerId() !== currentPlayerId) return;
-
-    const currentPhase = room.gameEngine.getTurnPhase();
-    if (currentPhase !== 'play' && currentPhase !== 'bonus_play') return;
-
-    const state = room.gameEngine.getClientState(currentPlayerId);
-    const hand = state.myHand;
-    
-    if (hand.length > 0) {
-      const randomIdx = Math.floor(Math.random() * hand.length);
-      const cardToPlay = hand[randomIdx];
-
-      const playRes = room.gameEngine.playCard(currentPlayerId, cardToPlay.id);
-      if (playRes.success) {
-        if (playRes.action) {
-          io.to(roomCode).emit('game:action', playRes.action);
-        }
-
-        setTimeout(() => {
-          if (!room.gameEngine) return;
-          const phase = room.gameEngine.getPhase();
-          
-          if (phase === 'round_over') {
-            stopTurnTimer(roomCode);
-            io.to(roomCode).emit('game:round-over', room.gameEngine.getRoundResult());
-          } else if (phase === 'game_over') {
-            stopTurnTimer(roomCode);
-            io.to(roomCode).emit('game:over', room.gameEngine.getRoundResult());
-          }
-
-          broadcastGameState(io, room);
-
-          if (phase === 'playing') {
-            const nextPlayer = room.gameEngine.getCurrentPlayerId();
-            io.to(nextPlayer).emit('game:your-turn');
-            resetTurnTimer(io, roomManager, roomCode);
-          }
-        }, 100);
-      }
-    }
-  }, delayBeforePlay);
-}
 
 export function registerHandlers(io: Server, roomManager: RoomManager): void {
   io.on('connection', (socket: Socket) => {
@@ -173,7 +89,6 @@ export function registerHandlers(io: Server, roomManager: RoomManager): void {
 
       const firstPlayer = room.gameEngine.getCurrentPlayerId();
       io.to(firstPlayer).emit('game:your-turn');
-      resetTurnTimer(io, roomManager, code);
     });
 
     socket.on('room:leave', () => {
@@ -224,11 +139,9 @@ export function registerHandlers(io: Server, roomManager: RoomManager): void {
         const phase = room.gameEngine.getPhase();
 
         if (phase === 'round_over') {
-          stopTurnTimer(room.code);
           const roundResult = room.gameEngine.getRoundResult();
           io.to(room.code).emit('game:round-over', roundResult);
         } else if (phase === 'game_over') {
-          stopTurnTimer(room.code);
           const roundResult = room.gameEngine.getRoundResult();
           io.to(room.code).emit('game:over', roundResult);
         }
@@ -238,7 +151,6 @@ export function registerHandlers(io: Server, roomManager: RoomManager): void {
         if (phase === 'playing') {
           const currentPlayer = room.gameEngine.getCurrentPlayerId();
           io.to(currentPlayer).emit('game:your-turn');
-          resetTurnTimer(io, roomManager, room.code);
         }
       }, 100);
     });
@@ -254,7 +166,6 @@ export function registerHandlers(io: Server, roomManager: RoomManager): void {
 
       const currentPlayer = room.gameEngine.getCurrentPlayerId();
       io.to(currentPlayer).emit('game:your-turn');
-      resetTurnTimer(io, roomManager, room.code);
     });
 
     socket.on('game:reconnect', (data: { code: string; playerName: string }, callback) => {
@@ -286,7 +197,6 @@ export function registerHandlers(io: Server, roomManager: RoomManager): void {
 
           if (room.gameEngine.getPhase() === 'playing' && room.gameEngine.getCurrentPlayerId() === socket.id) {
             io.to(socket.id).emit('game:your-turn');
-            resetTurnTimer(io, roomManager, data.code);
           }
         } else {
           callback({ ok: true, room: roomState });
@@ -326,7 +236,6 @@ function handleLeave(socket: Socket, io: Server, roomManager: RoomManager): void
   socket.leave(code);
 
   if (isEmpty) {
-    stopTurnTimer(code);
     return;
   }
 
