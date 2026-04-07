@@ -9,7 +9,6 @@ import { DrawPile } from './DrawPile';
 import { OpponentSeat } from './OpponentSeat';
 import { PlayerHand } from './PlayerHand';
 import { ScoreBoard } from './ScoreBoard';
-import { TurnTimer } from './TurnTimer';
 import { CardStack } from '@/components/cards/CardStack';
 
 interface GameTableProps {
@@ -363,12 +362,6 @@ export function GameTable({ myPlayerId }: GameTableProps) {
                 YOUR TURN
               </motion.span>
             )}
-            <TurnTimer
-              isMyTurn={isCurrentPlayerMe}
-              currentPlayerId={currentPlayerId}
-              roundNumber={gameState.roundNumber}
-              turnPhase={turnPhase}
-            />
           </div>
         )}
         <ScoreBoard gameState={gameState} myPlayerId={myPlayerId} />
@@ -418,12 +411,6 @@ export function GameTable({ myPlayerId }: GameTableProps) {
               background: 'rgba(0,0,0,0.65)',
               border: '1px solid rgba(212,168,67,0.2)',
             }}>
-            <TurnTimer
-              isMyTurn={false}
-              currentPlayerId={currentPlayerId}
-              roundNumber={gameState.roundNumber}
-              turnPhase={turnPhase}
-            />
             <div className="gold-text font-bold">WAITING</div>
             <div className="text-gray-400 truncate max-w-20">
               {players.find(p => p.id === currentPlayerId)?.name}
