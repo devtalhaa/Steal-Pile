@@ -11,6 +11,38 @@ import { PlayerHand } from './PlayerHand';
 import { ScoreBoard } from './ScoreBoard';
 import { CardStack } from '@/components/cards/CardStack';
 
+// ============ TURN TIMER COMPONENT ============
+
+function TurnTimer({ turnEndsAt, size = 'normal' }: { turnEndsAt: number | null; size?: 'normal' | 'small' }) {
+  const [secondsLeft, setSecondsLeft] = useState(30);
+
+  useEffect(() => {
+    if (!turnEndsAt) { setSecondsLeft(30); return; }
+
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((turnEndsAt - Date.now()) / 1000));
+      setSecondsLeft(remaining);
+    };
+    tick();
+    const interval = setInterval(tick, 200);
+    return () => clearInterval(interval);
+  }, [turnEndsAt]);
+
+  if (!turnEndsAt) return null;
+
+  const isUrgent = secondsLeft <= 5;
+  const isNormal = size === 'normal';
+
+  return (
+    <motion.div
+      className={`font-bold tabular-nums ${isNormal ? 'text-2xl' : 'text-sm'} ${isUrgent ? 'text-red-500' : 'gold-text'}`}
+      animate={isUrgent ? { scale: [1, 1.15, 1], opacity: [1, 0.7, 1] } : {}}
+      transition={isUrgent ? { duration: 0.6, repeat: Infinity } : {}}>
+      {secondsLeft}s
+    </motion.div>
+  );
+}
+
 interface GameTableProps {
   myPlayerId: string;
 }
@@ -333,6 +365,9 @@ export function GameTable({ myPlayerId }: GameTableProps) {
               {pendingAction.type === 'match_and_steal' && '⚡ MATCH & STEAL!'}
               {pendingAction.type === 'play_to_middle' && '→ No match — card to middle'}
               {(pendingAction.type === 'round_over' || pendingAction.type === 'game_over') && '🃏 Round Over'}
+              {pendingAction.autoPlayed && (
+                <div className="text-xs text-red-300 mt-1 font-normal">⏱ Auto-played (time ran out)</div>
+              )}
             </div>
           </motion.div>
         )}
@@ -381,6 +416,17 @@ export function GameTable({ myPlayerId }: GameTableProps) {
         </div>
       )}
 
+      {/* Turn timer — shown above hand when it's my turn */}
+      {isCurrentPlayerMe && gameState.turnEndsAt && (
+        <div className="absolute z-30 pointer-events-none"
+          style={{ bottom: '180px', left: '50%', transform: 'translateX(-50%)' }}>
+          <div className="px-4 py-1.5 rounded-full"
+            style={{ background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(212,168,67,0.3)' }}>
+            <TurnTimer turnEndsAt={gameState.turnEndsAt} />
+          </div>
+        </div>
+      )}
+
       {/* My hand — bottom */}
       {myPlayer && (
         <div className="absolute bottom-0 left-0 right-0 pb-3 flex flex-col items-center z-20 pointer-events-auto">
@@ -416,6 +462,7 @@ export function GameTable({ myPlayerId }: GameTableProps) {
               {players.find(p => p.id === currentPlayerId)?.name}
             </div>
             <div className="text-gray-600 text-[10px]">is playing</div>
+            {gameState.turnEndsAt && <TurnTimer turnEndsAt={gameState.turnEndsAt} size="small" />}
           </div>
         </div>
       )}

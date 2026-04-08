@@ -63,6 +63,7 @@ export interface ClientGameState {
   teamAPileCount?: number;
   teamBPileTop?: Card | null;
   teamBPileCount?: number;
+  turnEndsAt: number | null;
 }
 
 export interface GameAction {
@@ -72,6 +73,7 @@ export interface GameAction {
   matchedMiddleCards?: Card[];
   stolenCards?: StolenPileInfo[];
   targetPlayerId?: string;
+  autoPlayed?: boolean;
 }
 
 export interface StolenPileInfo {
