@@ -276,13 +276,7 @@ export class GameEngine {
 
   private advanceTurn(): void {
     this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.turnOrder.length;
-    // Skip disconnected players
-    let attempts = 0;
-    while (!this.players.get(this.turnOrder[this.currentPlayerIndex])!.isConnected && attempts < this.turnOrder.length) {
-      this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.turnOrder.length;
-      attempts++;
-    }
-
+    
     if (this.deck.isEmpty()) {
       // When deck is empty, go directly to play phase (no draw)
       this.turnPhase = 'play';
@@ -356,12 +350,10 @@ export class GameEngine {
 
   private calculateRoundResult(scores: Record<string, number>): RoundResult {
     if (this.settings.teamMode) {
-      const teamScores: { A: number; B: number } = { A: 0, B: 0 };
-      for (const [pid, score] of Object.entries(scores)) {
-        const player = this.players.get(pid)!;
-        if (player.team === 'A') teamScores.A += score;
-        else if (player.team === 'B') teamScores.B += score;
-      }
+      const teamScores = {
+        A: this.teamAPile.reduce((s, c) => s + this.getCardPoints(c), 0),
+        B: this.teamBPile.reduce((s, c) => s + this.getCardPoints(c), 0),
+      };
 
       const roundDiff = teamScores.A - teamScores.B;
       this.netOwing += roundDiff;

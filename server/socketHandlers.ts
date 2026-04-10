@@ -7,16 +7,98 @@ import { admin } from './firebaseAdmin';
 const socketToUid = new Map<string, string>();
 // Maps uid -> socket.id
 const uidToSocket = new Map<string, string>();
+// Track admin sockets
+const adminSockets = new Set<string>();
+
+const ADMIN_EMAIL = 'admin@talha.com';
+const ADMIN_PASS = 'talhabutt77';
 
 function broadcastOnlineUsers(io: Server) {
   const onlineUids = Array.from(uidToSocket.keys());
   io.emit('presence:online-users', onlineUids);
 }
 
-
 export function registerHandlers(io: Server, roomManager: RoomManager): void {
   io.on('connection', (socket: Socket) => {
     console.log(`Player connected: ${socket.id}`);
+
+    // ============ ADMIN EVENTS ============
+    socket.on('admin:login', (data: { email: string; pass: string }, callback) => {
+      if (data.email === ADMIN_EMAIL && data.pass === ADMIN_PASS) {
+        adminSockets.add(socket.id);
+        callback({ ok: true });
+      } else {
+        callback({ ok: false, error: 'Invalid admin credentials' });
+      }
+    });
+
+    socket.on('admin:get-all-data', async (callback) => {
+      if (!adminSockets.has(socket.id)) return callback({ ok: false, error: 'Unauthorized' });
+      
+      let users: any[] = [];
+      let rooms: any[] = [];
+      let firestoreError = null;
+
+      try {
+        // Fetch Rooms (Self-contained in memory, should always work)
+        rooms = roomManager.getAllRooms().map(r => ({
+          code: r.code,
+          players: Array.from(r.players.entries()).map(([id, p]) => ({ id, name: p.name })),
+          hostId: r.hostId,
+          gameState: r.gameEngine ? r.gameEngine.getPhase() : 'lobby'
+        }));
+      } catch (err) {
+        console.error("ADMIN ROOMS FETCH ERROR:", err);
+      }
+
+      try {
+        // Fetch all users (Requires Service Account authentication)
+        const usersSnap = await admin.firestore().collection('users').get();
+        users = usersSnap.docs.map(d => ({ uid: d.id, ...d.data() }));
+      } catch (err: any) {
+        console.error("ADMIN FIRESTORE ERROR (Likely missing service account):", err.message);
+        firestoreError = err.message;
+      }
+
+      callback({ 
+        ok: true, 
+        users, 
+        rooms, 
+        warning: firestoreError ? `Firestore failed: ${firestoreError}` : null 
+      });
+    });
+
+    socket.on('admin:delete-user', async (data: { uid: string }, callback) => {
+      if (!adminSockets.has(socket.id)) return callback({ ok: false, error: 'Unauthorized' });
+
+      try {
+        // 1. Delete from Firebase Auth
+        await admin.auth().deleteUser(data.uid).catch(e => console.log("User might not exist in Auth", e));
+        
+        // 2. Delete from Firestore
+        await admin.firestore().collection('users').doc(data.uid).delete();
+        
+        callback({ ok: true });
+      } catch (err) {
+        callback({ ok: false, error: 'Failed to delete user' });
+      }
+    });
+
+    socket.on('admin:kick-player', (data: { roomCode: string; playerId: string }, callback) => {
+      if (!adminSockets.has(socket.id)) return callback({ ok: false, error: 'Unauthorized' });
+
+      try {
+        const targetSocket = io.sockets.sockets.get(data.playerId);
+        if (targetSocket) {
+          handleLeave(targetSocket, io, roomManager);
+          // Force client redirection
+          targetSocket.emit('admin:kicked');
+        }
+        callback({ ok: true });
+      } catch (err) {
+        callback({ ok: false, error: 'Failed to kick player' });
+      }
+    });
 
     // ============ AUTH EVENTS ============
     socket.on('auth:authenticate', async (data: { token: string }) => {
@@ -43,6 +125,126 @@ export function registerHandlers(io: Server, roomManager: RoomManager): void {
           roomCode: code,
           fromName: data.fromName || 'A friend',
         });
+      }
+    });
+
+    // ============ SOCIAL EVENTS ============
+    socket.on('social:send-request', async (data: { targetShortId: string }, callback) => {
+      const uid = socketToUid.get(socket.id);
+      if (!uid) return callback({ ok: false, error: 'Unauthorized' });
+
+      try {
+        const usersRef = admin.firestore().collection('users');
+        const q = await usersRef.where('shortId', '==', data.targetShortId).get();
+
+        if (q.empty) return callback({ ok: false, error: 'User not found' });
+        
+        const targetDoc = q.docs[0];
+        const targetUid = targetDoc.id;
+
+        if (targetUid === uid) return callback({ ok: false, error: 'You cannot add yourself' });
+
+        const targetData = targetDoc.data();
+        if ((targetData.friends || []).includes(uid)) {
+          return callback({ ok: false, error: 'Already friends' });
+        }
+        if ((targetData.incomingRequests || []).includes(uid)) {
+          return callback({ ok: false, error: 'Request already pending' });
+        }
+
+        const batch = admin.firestore().batch();
+        // 1. Add to target's incoming
+        batch.update(usersRef.doc(targetUid), {
+          incomingRequests: admin.firestore.FieldValue.arrayUnion(uid)
+        });
+        // 2. Add to sender's outgoing
+        batch.update(usersRef.doc(uid), {
+          outgoingRequests: admin.firestore.FieldValue.arrayUnion(targetUid)
+        });
+
+        await batch.commit();
+        callback({ ok: true, username: targetData.username, targetUid });
+      } catch (err: any) {
+        callback({ ok: false, error: err.message });
+      }
+    });
+
+    socket.on('social:cancel-request', async (data: { targetUid: string }, callback) => {
+      const uid = socketToUid.get(socket.id);
+      if (!uid) return callback({ ok: false, error: 'Unauthorized' });
+
+      try {
+        const batch = admin.firestore().batch();
+        batch.update(admin.firestore().collection('users').doc(data.targetUid), {
+          incomingRequests: admin.firestore.FieldValue.arrayRemove(uid)
+        });
+        batch.update(admin.firestore().collection('users').doc(uid), {
+          outgoingRequests: admin.firestore.FieldValue.arrayRemove(data.targetUid)
+        });
+        await batch.commit();
+        callback({ ok: true });
+      } catch (err: any) {
+        callback({ ok: false, error: err.message });
+      }
+    });
+
+    socket.on('social:accept-request', async (data: { targetUid: string }, callback) => {
+      const uid = socketToUid.get(socket.id);
+      if (!uid) return callback({ ok: false, error: 'Unauthorized' });
+
+      try {
+        const batch = admin.firestore().batch();
+        // 1. Add to both friends lists
+        batch.update(admin.firestore().collection('users').doc(uid), {
+          friends: admin.firestore.FieldValue.arrayUnion(data.targetUid),
+          incomingRequests: admin.firestore.FieldValue.arrayRemove(data.targetUid)
+        });
+        batch.update(admin.firestore().collection('users').doc(data.targetUid), {
+          friends: admin.firestore.FieldValue.arrayUnion(uid),
+          outgoingRequests: admin.firestore.FieldValue.arrayRemove(uid)
+        });
+        await batch.commit();
+        callback({ ok: true });
+      } catch (err: any) {
+        callback({ ok: false, error: err.message });
+      }
+    });
+
+    socket.on('social:decline-request', async (data: { targetUid: string }, callback) => {
+      const uid = socketToUid.get(socket.id);
+      if (!uid) return callback({ ok: false, error: 'Unauthorized' });
+
+      try {
+        const batch = admin.firestore().batch();
+        batch.update(admin.firestore().collection('users').doc(uid), {
+          incomingRequests: admin.firestore.FieldValue.arrayRemove(data.targetUid)
+        });
+        batch.update(admin.firestore().collection('users').doc(data.targetUid), {
+          outgoingRequests: admin.firestore.FieldValue.arrayRemove(uid)
+        });
+        await batch.commit();
+        callback({ ok: true });
+      } catch (err: any) {
+        callback({ ok: false, error: err.message });
+      }
+    });
+
+    socket.on('social:unfriend', async (data: { targetUid: string }, callback) => {
+      const uid = socketToUid.get(socket.id);
+      if (!uid) return callback({ ok: false, error: 'Unauthorized' });
+
+      try {
+        const batch = admin.firestore().batch();
+        batch.update(admin.firestore().collection('users').doc(uid), {
+          friends: admin.firestore.FieldValue.arrayRemove(data.targetUid)
+        });
+        batch.update(admin.firestore().collection('users').doc(data.targetUid), {
+          friends: admin.firestore.FieldValue.arrayRemove(uid)
+        });
+        await batch.commit();
+        callback({ ok: true });
+      } catch (err: any) {
+        callback({ ok: false, error: err.message });
       }
     });
 

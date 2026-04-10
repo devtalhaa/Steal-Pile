@@ -61,7 +61,10 @@ export const useGameStore = create<GameStore>((set) => ({
   setMyPlayer: (id, name) => set({ myPlayerId: id, myPlayerName: name }),
   setConnected: (connected) => set({ isConnected: connected }),
   setRoom: (room) => set({ room }),
-  setGameState: (state) => set({ gameState: state }),
+  setGameState: (state) => set((s) => ({ 
+    gameState: state,
+    isMyTurn: state ? state.currentPlayerId === s.myPlayerId : false
+  })),
   setMyTurn: (isMyTurn) => set({ isMyTurn }),
   setPendingAction: (action) => set({ pendingAction: action }),
   setAnimating: (animating) => set({ isAnimating: animating }),

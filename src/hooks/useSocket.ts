@@ -7,7 +7,7 @@ import { auth } from '@/lib/firebase';
 
 export function useSocket() {
   const {
-    setConnected, setMyPlayer, setRoom, setGameState,
+    isConnected, setConnected, setMyPlayer, setRoom, setGameState,
     setMyTurn, setPendingAction, setRoundResult, setGameResult, setError,
   } = useGameStore();
 
@@ -75,6 +75,11 @@ export function useSocket() {
       }
     };
 
+    const onAdminKicked = () => {
+      alert('You have been removed from the room by an administrator.');
+      window.location.href = '/';
+    };
+
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('room:state', onRoomState);
@@ -86,9 +91,9 @@ export function useSocket() {
     socket.on('game:over', onGameOver);
     socket.on('game:error', onGameError);
     socket.on('player:disconnected', onPlayerDisconnected);
-    socket.on('player:disconnected', onPlayerDisconnected);
     socket.on('player:reconnected', onPlayerReconnected);
     socket.on('game:receive-invite', onReceiveInvite);
+    socket.on('admin:kicked', onAdminKicked);
 
     return () => {
       socket.off('connect', onConnect);
@@ -102,9 +107,9 @@ export function useSocket() {
       socket.off('game:over', onGameOver);
       socket.off('game:error', onGameError);
       socket.off('player:disconnected', onPlayerDisconnected);
-      socket.off('player:disconnected', onPlayerDisconnected);
       socket.off('player:reconnected', onPlayerReconnected);
       socket.off('game:receive-invite', onReceiveInvite);
+      socket.off('admin:kicked', onAdminKicked);
     };
   }, [setConnected, setMyPlayer, setRoom, setGameState, setMyTurn, setPendingAction, setRoundResult, setGameResult, setError]);
 
@@ -127,9 +132,51 @@ export function useSocket() {
         }
       }
     };
+    
+    const handleOnline = () => {
+      const socket = getSocket();
+      if (!socket.connected) {
+        socket.connect();
+      }
+    };
+
     document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, []);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', () => setConnected(false));
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [setConnected]);
+
+  // Sync authentication when user becomes available or socket connects
+  useEffect(() => {
+    const socket = getSocket();
+    
+    const syncAuth = async () => {
+      if (socket.connected && auth.currentUser) {
+        try {
+          const token = await auth.currentUser.getIdToken(true);
+          socket.emit('auth:authenticate', { token });
+        } catch (e) {
+          console.error("Failed to sync socket authentication", e);
+        }
+      }
+    };
+
+    // Run immediately in case user is already there
+    syncAuth();
+
+    // Also listen for auth state changes (login/logout)
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        syncAuth();
+      }
+    });
+
+    return () => unsubscribe();
+  }, [isConnected]); // Re-run if connection status changes
 
   return getSocket();
 }

@@ -6,6 +6,8 @@ import { useGameStore } from '@/store/gameStore';
 import { useGameActions } from '@/hooks/useGameActions';
 import { useRouter } from 'next/navigation';
 import { RoomPlayer } from '@/types/game';
+import { useAuthStore } from '@/store/authStore';
+import { FriendsList } from './FriendsList';
 
 interface LobbyProps {
   code: string;
@@ -25,9 +27,11 @@ export function Lobby({ code }: LobbyProps) {
   const myPlayerId = useGameStore(s => s.myPlayerId);
   const error = useGameStore(s => s.error);
   const setError = useGameStore(s => s.setError);
+  const { user } = useAuthStore();
 
   const { startGame, leaveRoom, updateSettings, assignTeams } = useGameActions();
   const [startLoading, setStartLoading] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
 
   if (!room) {
     return (
@@ -101,11 +105,18 @@ export function Lobby({ code }: LobbyProps) {
         <div className="lobby-panel" style={{ padding: '16px', alignItems: 'center' }}>
           <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-1">Room Code — Share with friends</p>
           <div className="room-code text-4xl">{code}</div>
-          <button
-            onClick={() => navigator.clipboard.writeText(code)}
-            className="mt-2 px-3 py-1 text-xs text-gray-400 bg-white/5 rounded-full hover:bg-white/10 hover:text-white transition-all border border-white/10">
-            📋 Copy Code
-          </button>
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={() => navigator.clipboard.writeText(code)}
+              className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 bg-white/5 rounded-lg hover:bg-white/10 hover:text-white transition-all border border-white/10">
+              📋 Copy Code
+            </button>
+            <button
+              onClick={() => setShowInviteModal(true)}
+              className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-yellow-500 bg-yellow-500/10 rounded-lg hover:bg-yellow-500/20 transition-all border border-yellow-500/20">
+              👥 Invite Friends
+            </button>
+          </div>
         </div>
 
         {/* Players grid */}
@@ -316,6 +327,46 @@ export function Lobby({ code }: LobbyProps) {
         </div>
 
       </div>
+
+      {/* Invite Friends Modal */}
+      <AnimatePresence>
+        {showInviteModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowInviteModal(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-sm bg-gray-900 border border-white/10 rounded-3xl overflow-hidden shadow-2xl"
+              style={{ maxHeight: '80vh' }}
+            >
+              <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                <h2 className="text-xl font-bold gold-text">Invite Friends</h2>
+                <button 
+                  onClick={() => setShowInviteModal(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 text-gray-400 hover:text-white transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="p-4 overflow-y-auto max-h-[60vh] custom-scrollbar">
+                <FriendsList />
+              </div>
+              <div className="p-4 bg-white/5 border-t border-white/5 text-center">
+                <p className="text-[10px] text-gray-500 uppercase tracking-widest">
+                  Players will receive an invite notification
+                </p>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

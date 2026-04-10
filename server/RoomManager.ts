@@ -267,6 +267,10 @@ export class RoomManager {
     };
   }
 
+  getAllRooms(): Room[] {
+    return Array.from(this.rooms.values());
+  }
+
   private generateCode(): string {
     let code: string;
     do {

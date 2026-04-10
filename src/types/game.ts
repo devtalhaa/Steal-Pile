@@ -113,6 +113,7 @@ export interface ServerToClientEvents {
   'game:receive-invite': (data: { roomCode: string; fromName: string }) => void;
   'auth:success': () => void;
   'auth:error': (data: { message: string }) => void;
+  'admin:kicked': () => void;
 }
 
 export interface ClientToServerEvents {
@@ -139,4 +140,39 @@ export interface ClientToServerEvents {
   ) => void;
   'auth:authenticate': (data: { token: string }) => void;
   'game:invite': (data: { targetUid: string; fromName?: string | null }) => void;
+  'admin:login': (
+    data: { email: string; pass: string },
+    callback: (res: { ok: true } | { ok: false; error: string }) => void
+  ) => void;
+  'admin:get-all-data': (
+    callback: (res: { ok: true; users: any[]; rooms: any[] } | { ok: false; error: string }) => void
+  ) => void;
+  'admin:delete-user': (
+    data: { uid: string },
+    callback: (res: { ok: true } | { ok: false; error: string }) => void
+  ) => void;
+  'admin:kick-player': (
+    data: { roomCode: string; playerId: string },
+    callback: (res: { ok: true } | { ok: false; error: string }) => void
+  ) => void;
+  'social:send-request': (
+    data: { targetShortId: string },
+    callback: (res: { ok: true; username?: string; targetUid?: string } | { ok: false; error: string }) => void
+  ) => void;
+  'social:cancel-request': (
+    data: { targetUid: string },
+    callback: (res: { ok: true } | { ok: false; error: string }) => void
+  ) => void;
+  'social:accept-request': (
+    data: { targetUid: string },
+    callback: (res: { ok: true } | { ok: false; error: string }) => void
+  ) => void;
+  'social:decline-request': (
+    data: { targetUid: string },
+    callback: (res: { ok: true } | { ok: false; error: string }) => void
+  ) => void;
+  'social:unfriend': (
+    data: { targetUid: string },
+    callback: (res: { ok: true } | { ok: false; error: string }) => void
+  ) => void;
 }
