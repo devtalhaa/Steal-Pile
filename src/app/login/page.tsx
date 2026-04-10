@@ -6,10 +6,11 @@ import { auth, db } from '@/lib/firebase';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  signInWithRedirect, 
-  getRedirectResult,
+  signInWithPopup, 
   GoogleAuthProvider,
-  updateProfile
+  updateProfile,
+  setPersistence,
+  browserLocalPersistence
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { useAuthStore } from '@/store/authStore';
@@ -36,53 +37,49 @@ export default function LoginPage() {
   const generateShortId = () => '#' + Math.floor(100000 + Math.random() * 900000).toString();
 
   useEffect(() => {
-    const handleRedirectResult = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result && result.user) {
-          const user = result.user;
-          const userDocRef = doc(db, 'users', user.uid);
-          const docSnap = await getDoc(userDocRef);
-          
-          let shortId = '';
-          if (!docSnap.exists()) {
-            shortId = generateShortId();
-            await setDoc(userDocRef, {
-              username: user.displayName || 'Player',
-              email: user.email,
-              friends: [],
-              shortId
-            });
-          } else {
-            shortId = docSnap.data().shortId;
-          }
-
-          setUser({
-            uid: user.uid,
-            email: user.email,
-            displayName: user.displayName || 'Player',
-            shortId
-          });
-
-          router.push('/');
-        }
-      } catch (err: any) {
-        setError(err.message || 'Failed to complete Google login');
-        setLoading(false);
-      }
-    };
-    
-    handleRedirectResult();
-  }, [router, setUser]);
+    // If AuthProvider already populated the user, redirect immediately
+    if (user) {
+      router.push('/');
+    }
+  }, [user, router]);
 
   const handleGoogle = async () => {
     setLoading(true);
     setError(null);
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithRedirect(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      
+      if (result.user) {
+        const user = result.user;
+        const userDocRef = doc(db, 'users', user.uid);
+        const docSnap = await getDoc(userDocRef);
+        
+        let shortId = '';
+        if (!docSnap.exists()) {
+          shortId = generateShortId();
+          await setDoc(userDocRef, {
+            username: user.displayName || 'Player',
+            email: user.email,
+            friends: [],
+            shortId
+          });
+        } else {
+          shortId = docSnap.data().shortId;
+        }
+
+        setUser({
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName || 'Player',
+          shortId
+        });
+
+        router.push('/');
+      }
     } catch (err: any) {
-      setError(err.message || 'Failed to initialize Google login');
+      setError(err.message || 'Failed to complete Google login');
+    } finally {
       setLoading(false);
     }
   };

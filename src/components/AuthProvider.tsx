@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { useAuthStore } from '@/store/authStore';
@@ -10,6 +10,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setUser, setLoading } = useAuthStore();
 
   useEffect(() => {
+    // Force local persistence to ensure sessions survive refreshes
+    setPersistence(auth, browserLocalPersistence).catch(console.error);
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         // Fetch user document from Firestore to get `shortId` and `friends`
