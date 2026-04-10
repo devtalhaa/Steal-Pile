@@ -65,6 +65,7 @@ export interface ClientGameState {
   teamAPileCount?: number;
   teamBPileTop?: Card | null;
   teamBPileCount?: number;
+  turnEndsAt: number | null;
 }
 
 export interface GameAction {
@@ -74,6 +75,7 @@ export interface GameAction {
   matchedMiddleCards?: Card[];
   stolenCards?: StolenPileInfo[];
   targetPlayerId?: string;
+  autoPlayed?: boolean;
 }
 
 export interface StolenPileInfo {
@@ -107,6 +109,10 @@ export interface ServerToClientEvents {
   'game:error': (data: { message: string }) => void;
   'player:disconnected': (data: { id: string; name: string }) => void;
   'player:reconnected': (data: { id: string; name: string }) => void;
+  'presence:online-users': (users: string[]) => void;
+  'game:receive-invite': (data: { roomCode: string; fromName: string }) => void;
+  'auth:success': () => void;
+  'auth:error': (data: { message: string }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -131,4 +137,6 @@ export interface ClientToServerEvents {
     data: { code: string; playerName: string },
     callback: (res: { ok: true; room: RoomState; gameState?: ClientGameState } | { ok: false; error: string }) => void
   ) => void;
+  'auth:authenticate': (data: { token: string }) => void;
+  'game:invite': (data: { targetUid: string; fromName?: string | null }) => void;
 }

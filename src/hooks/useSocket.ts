@@ -3,6 +3,7 @@
 import { useEffect, useCallback } from 'react';
 import { connectSocket, getSocket } from '@/lib/socket';
 import { useGameStore } from '@/store/gameStore';
+import { auth } from '@/lib/firebase';
 
 export function useSocket() {
   const {
@@ -13,10 +14,20 @@ export function useSocket() {
   const setupListeners = useCallback(() => {
     const socket = getSocket();
 
-    const onConnect = () => {
+    const onConnect = async () => {
       setConnected(true);
       const storedName = useGameStore.getState().myPlayerName || 'Player';
       setMyPlayer(socket.id!, storedName);
+
+      // Authenticate with server if logged in
+      if (auth.currentUser) {
+        try {
+          const token = await auth.currentUser.getIdToken(true);
+          socket.emit('auth:authenticate', { token });
+        } catch (e) {
+          console.error("Failed to authenticate socket socket", e);
+        }
+      }
 
       const sessionCode = typeof window !== 'undefined' ? sessionStorage.getItem('khoti_room_code') : null;
       const sessionName = typeof window !== 'undefined' ? sessionStorage.getItem('khoti_player_name') : null;
@@ -57,6 +68,12 @@ export function useSocket() {
     const onGameError = (data: any) => setError(data.message);
     const onPlayerDisconnected = (data: any) => console.log(`${data.name} disconnected`);
     const onPlayerReconnected = (data: any) => console.log(`${data.name} reconnected`);
+    const onReceiveInvite = (data: { roomCode: string; fromName: string }) => {
+      const accept = window.confirm(`${data.fromName} invited you to play Khoti! Join game?`);
+      if (accept) {
+        window.location.href = `/game/${data.roomCode}`;
+      }
+    };
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
@@ -69,7 +86,9 @@ export function useSocket() {
     socket.on('game:over', onGameOver);
     socket.on('game:error', onGameError);
     socket.on('player:disconnected', onPlayerDisconnected);
+    socket.on('player:disconnected', onPlayerDisconnected);
     socket.on('player:reconnected', onPlayerReconnected);
+    socket.on('game:receive-invite', onReceiveInvite);
 
     return () => {
       socket.off('connect', onConnect);
@@ -83,7 +102,9 @@ export function useSocket() {
       socket.off('game:over', onGameOver);
       socket.off('game:error', onGameError);
       socket.off('player:disconnected', onPlayerDisconnected);
+      socket.off('player:disconnected', onPlayerDisconnected);
       socket.off('player:reconnected', onPlayerReconnected);
+      socket.off('game:receive-invite', onReceiveInvite);
     };
   }, [setConnected, setMyPlayer, setRoom, setGameState, setMyTurn, setPendingAction, setRoundResult, setGameResult, setError]);
 

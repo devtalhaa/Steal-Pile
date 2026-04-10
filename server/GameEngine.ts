@@ -5,6 +5,8 @@ import {
   RoundResult, ServerPlayerState,
 } from './types';
 
+const TURN_TIMER_MS = 30_000;
+
 interface PlayerInit {
   id: string;
   name: string;
@@ -27,6 +29,9 @@ export class GameEngine {
   private lastRoundResult?: RoundResult;
   private teamAPile: Card[] = [];
   private teamBPile: Card[] = [];
+  private turnTimer: ReturnType<typeof setTimeout> | null = null;
+  private turnEndsAt: number | null = null;
+  private onTurnTimeout: ((playerId: string) => void) | null = null;
 
   constructor(playerInits: PlayerInit[], settings: RoomSettings) {
     this.settings = settings;
@@ -48,6 +53,7 @@ export class GameEngine {
   }
 
   startRound(): void {
+    this.clearTurnTimer();
     this.deck = new Deck(this.settings.deckCount);
     this.phase = 'playing';
     this.currentPlayerIndex = 0;
@@ -296,6 +302,7 @@ export class GameEngine {
   }
 
   private handleRoundOver(): void {
+    this.clearTurnTimer();
     const scores = this.calculateScores();
     const result = this.calculateRoundResult(scores);
     this.lastRoundResult = result;
@@ -476,11 +483,60 @@ export class GameEngine {
         ? (this.teamBPile.length > 0 ? this.teamBPile[this.teamBPile.length - 1] : null)
         : undefined,
       teamBPileCount: this.settings.teamMode ? this.teamBPile.length : undefined,
+      turnEndsAt: this.turnEndsAt,
     };
   }
 
   getPlayerIds(): string[] {
     return [...this.turnOrder];
+  }
+
+  // ============ TURN TIMER ============
+
+  setTurnTimeoutCallback(cb: (playerId: string) => void): void {
+    this.onTurnTimeout = cb;
+  }
+
+  startTurnTimer(): void {
+    this.clearTurnTimer();
+    if (this.phase !== 'playing') return;
+
+    const playerId = this.getCurrentPlayerId();
+    const player = this.players.get(playerId);
+    if (!player) return;
+
+    // Don't start timer if player has no cards and can't draw
+    if (player.hand.length === 0 && this.deck.isEmpty()) return;
+
+    this.turnEndsAt = Date.now() + TURN_TIMER_MS;
+
+    this.turnTimer = setTimeout(() => {
+      this.turnTimer = null;
+      this.turnEndsAt = null;
+      if (this.onTurnTimeout) {
+        this.onTurnTimeout(playerId);
+      }
+    }, TURN_TIMER_MS);
+  }
+
+  clearTurnTimer(): void {
+    if (this.turnTimer) {
+      clearTimeout(this.turnTimer);
+      this.turnTimer = null;
+    }
+    this.turnEndsAt = null;
+  }
+
+  getRandomCardFromHand(playerId: string): string | null {
+    const player = this.players.get(playerId);
+    if (!player || player.hand.length === 0) return null;
+    const randomIndex = Math.floor(Math.random() * player.hand.length);
+    return player.hand[randomIndex].id;
+  }
+
+  skipCurrentPlayer(): void {
+    if (this.phase !== 'playing') return;
+    this.advanceTurn();
   }
 
   replacePlayerId(oldId: string, newId: string): boolean {

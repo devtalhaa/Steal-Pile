@@ -11,6 +11,64 @@ import { PlayerHand } from './PlayerHand';
 import { ScoreBoard } from './ScoreBoard';
 import { CardStack } from '@/components/cards/CardStack';
 
+// ============ TURN TIMER COMPONENT ============
+
+function TurnTimer({ turnEndsAt, size = 'normal' }: { turnEndsAt: number | null; size?: 'normal' | 'small' }) {
+  const [secondsLeft, setSecondsLeft] = useState(30);
+
+  useEffect(() => {
+    if (!turnEndsAt) { setSecondsLeft(30); return; }
+
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((turnEndsAt - Date.now()) / 1000));
+      setSecondsLeft(remaining);
+    };
+    tick();
+    const interval = setInterval(tick, 200);
+    return () => clearInterval(interval);
+  }, [turnEndsAt]);
+
+  if (!turnEndsAt) return null;
+
+  const maxTime = 30; // 30s turn max reference
+  const progress = Math.max(0, Math.min(1, secondsLeft / maxTime));
+  
+  const radius = size === 'normal' ? 8 : 6;
+  const strokeWidth = size === 'normal' ? 2 : 1.5;
+  const cx = size === 'normal' ? 10 : 8;
+  const cy = size === 'normal' ? 10 : 8;
+  const dim = size === 'normal' ? 20 : 16;
+  
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - progress * circumference;
+
+  const isUrgent = secondsLeft <= 5;
+
+  return (
+    <div className={`flex items-center gap-1.5 bg-black/40 px-2 py-1 rounded-full ${size === 'normal' ? 'ml-1' : 'mx-auto'}`}>
+      <svg width={dim} height={dim} className="-rotate-90 flex-shrink-0">
+        <circle cx={cx} cy={cy} r={radius} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth={strokeWidth} />
+        <motion.circle 
+          cx={cx} cy={cy} r={radius} 
+          fill="none" 
+          stroke={isUrgent ? "#ef4444" : "#60a5fa"} 
+          strokeWidth={strokeWidth} 
+          strokeDasharray={circumference}
+          strokeLinecap="round"
+          animate={{ strokeDashoffset }}
+          transition={{ duration: 0.2, ease: "linear" }}
+        />
+      </svg>
+      <motion.span
+        className={`font-bold tabular-nums ${size === 'normal' ? 'text-sm' : 'text-xs'} ${isUrgent ? 'text-red-500' : 'text-blue-400'}`}
+        animate={isUrgent ? { scale: [1, 1.1, 1] } : {}}
+        transition={isUrgent ? { duration: 0.6, repeat: Infinity } : {}}>
+        {secondsLeft}
+      </motion.span>
+    </div>
+  );
+}
+
 interface GameTableProps {
   myPlayerId: string;
 }
@@ -333,6 +391,9 @@ export function GameTable({ myPlayerId }: GameTableProps) {
               {pendingAction.type === 'match_and_steal' && '⚡ MATCH & STEAL!'}
               {pendingAction.type === 'play_to_middle' && '→ No match — card to middle'}
               {(pendingAction.type === 'round_over' || pendingAction.type === 'game_over') && '🃏 Round Over'}
+              {pendingAction.autoPlayed && (
+                <div className="text-xs text-red-300 mt-1 font-normal">⏱ Auto-played (time ran out)</div>
+              )}
             </div>
           </motion.div>
         )}
@@ -355,12 +416,16 @@ export function GameTable({ myPlayerId }: GameTableProps) {
               </span>
             )}
             {isCurrentPlayerMe && (
-              <motion.span
-                className="text-[10px] gold-text font-bold ml-1"
-                animate={{ opacity: [1, 0.4, 1] }}
-                transition={{ duration: 1, repeat: Infinity }}>
-                YOUR TURN
-              </motion.span>
+              gameState.turnEndsAt ? (
+                <TurnTimer turnEndsAt={gameState.turnEndsAt} />
+              ) : (
+                <motion.span
+                  className="text-[10px] gold-text font-bold ml-1"
+                  animate={{ opacity: [1, 0.4, 1] }}
+                  transition={{ duration: 1, repeat: Infinity }}>
+                  YOUR TURN
+                </motion.span>
+              )
             )}
           </div>
         )}
@@ -380,6 +445,8 @@ export function GameTable({ myPlayerId }: GameTableProps) {
           🃏 Deck Empty — 1 card/turn
         </div>
       )}
+
+      {/* (Central turn timer was moved to the top-left player badge) */}
 
       {/* My hand — bottom */}
       {myPlayer && (
@@ -416,6 +483,7 @@ export function GameTable({ myPlayerId }: GameTableProps) {
               {players.find(p => p.id === currentPlayerId)?.name}
             </div>
             <div className="text-gray-600 text-[10px]">is playing</div>
+            {gameState.turnEndsAt && <TurnTimer turnEndsAt={gameState.turnEndsAt} size="small" />}
           </div>
         </div>
       )}
