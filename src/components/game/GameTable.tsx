@@ -30,16 +30,42 @@ function TurnTimer({ turnEndsAt, size = 'normal' }: { turnEndsAt: number | null;
 
   if (!turnEndsAt) return null;
 
+  const maxTime = 30; // 30s turn max reference
+  const progress = Math.max(0, Math.min(1, secondsLeft / maxTime));
+  
+  const radius = size === 'normal' ? 8 : 6;
+  const strokeWidth = size === 'normal' ? 2 : 1.5;
+  const cx = size === 'normal' ? 10 : 8;
+  const cy = size === 'normal' ? 10 : 8;
+  const dim = size === 'normal' ? 20 : 16;
+  
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - progress * circumference;
+
   const isUrgent = secondsLeft <= 5;
-  const isNormal = size === 'normal';
 
   return (
-    <motion.div
-      className={`font-bold tabular-nums ${isNormal ? 'text-2xl' : 'text-sm'} ${isUrgent ? 'text-red-500' : 'gold-text'}`}
-      animate={isUrgent ? { scale: [1, 1.15, 1], opacity: [1, 0.7, 1] } : {}}
-      transition={isUrgent ? { duration: 0.6, repeat: Infinity } : {}}>
-      {secondsLeft}s
-    </motion.div>
+    <div className={`flex items-center gap-1.5 bg-black/40 px-2 py-1 rounded-full ${size === 'normal' ? 'ml-1' : 'mx-auto'}`}>
+      <svg width={dim} height={dim} className="-rotate-90 flex-shrink-0">
+        <circle cx={cx} cy={cy} r={radius} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth={strokeWidth} />
+        <motion.circle 
+          cx={cx} cy={cy} r={radius} 
+          fill="none" 
+          stroke={isUrgent ? "#ef4444" : "#60a5fa"} 
+          strokeWidth={strokeWidth} 
+          strokeDasharray={circumference}
+          strokeLinecap="round"
+          animate={{ strokeDashoffset }}
+          transition={{ duration: 0.2, ease: "linear" }}
+        />
+      </svg>
+      <motion.span
+        className={`font-bold tabular-nums ${size === 'normal' ? 'text-sm' : 'text-xs'} ${isUrgent ? 'text-red-500' : 'text-blue-400'}`}
+        animate={isUrgent ? { scale: [1, 1.1, 1] } : {}}
+        transition={isUrgent ? { duration: 0.6, repeat: Infinity } : {}}>
+        {secondsLeft}
+      </motion.span>
+    </div>
   );
 }
 
@@ -390,12 +416,16 @@ export function GameTable({ myPlayerId }: GameTableProps) {
               </span>
             )}
             {isCurrentPlayerMe && (
-              <motion.span
-                className="text-[10px] gold-text font-bold ml-1"
-                animate={{ opacity: [1, 0.4, 1] }}
-                transition={{ duration: 1, repeat: Infinity }}>
-                YOUR TURN
-              </motion.span>
+              gameState.turnEndsAt ? (
+                <TurnTimer turnEndsAt={gameState.turnEndsAt} />
+              ) : (
+                <motion.span
+                  className="text-[10px] gold-text font-bold ml-1"
+                  animate={{ opacity: [1, 0.4, 1] }}
+                  transition={{ duration: 1, repeat: Infinity }}>
+                  YOUR TURN
+                </motion.span>
+              )
             )}
           </div>
         )}
@@ -416,16 +446,7 @@ export function GameTable({ myPlayerId }: GameTableProps) {
         </div>
       )}
 
-      {/* Turn timer — shown above hand when it's my turn */}
-      {isCurrentPlayerMe && gameState.turnEndsAt && (
-        <div className="absolute z-30 pointer-events-none"
-          style={{ bottom: '180px', left: '50%', transform: 'translateX(-50%)' }}>
-          <div className="px-4 py-1.5 rounded-full"
-            style={{ background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(212,168,67,0.3)' }}>
-            <TurnTimer turnEndsAt={gameState.turnEndsAt} />
-          </div>
-        </div>
-      )}
+      {/* (Central turn timer was moved to the top-left player badge) */}
 
       {/* My hand — bottom */}
       {myPlayer && (

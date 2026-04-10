@@ -74,12 +74,16 @@ body {
 }
 
 .playing-card.playable {
-  animation: pulse-gold 1.5s ease-in-out infinite;
+  animation: pulse-actionable 1.2s ease-in-out infinite;
 }
 
-@keyframes pulse-gold {
-  0%, 100% { box-shadow: 0 4px 16px rgba(0,0,0,0.5), 0 0 0 0 rgba(255,215,0,0); }
-  50% { box-shadow: 0 4px 16px rgba(0,0,0,0.5), 0 0 0 4px rgba(255,215,0,0.4); }
+@keyframes pulse-actionable {
+  0%, 100% { 
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5), 0 0 10px 2px rgba(6, 182, 212, 0.5); 
+  }
+  50% { 
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5), 0 0 25px 8px rgba(34, 211, 238, 1), 0 0 50px 10px rgba(8, 145, 178, 0.8); 
+  }
 }
 
 .table-edge {

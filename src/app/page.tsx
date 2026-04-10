@@ -9,6 +9,10 @@ import { useSettingsStore, CardBackStyle } from '@/store/settingsStore';
 import { connectSocket } from '@/lib/socket';
 import { RoomSettings } from '@/types/game';
 import { CardBack } from '@/components/cards/CardBack';
+import { WelcomeDialog } from '@/components/lobby/WelcomeDialog';
+import { FriendsList } from '@/components/lobby/FriendsList';
+import { ChangeNameModal } from '@/components/lobby/ChangeNameModal';
+import { useAuthStore } from '@/store/authStore';
 
 const DEFAULT_SETTINGS: RoomSettings = {
   deckCount: 1,
@@ -36,18 +40,24 @@ export default function Home() {
   const storedStyle = useSettingsStore(s => s.cardBack);
   const setCardBack = useSettingsStore(s => s.setCardBack);
 
-  const [mode, setMode] = useState<'menu' | 'create' | 'join' | 'settings'>('menu');
-  const [playerName, setPlayerName] = useState('');
+  const [mode, setMode] = useState<'menu' | 'create' | 'join' | 'settings' | 'friends'>('menu');
   const [joinCode, setJoinCode] = useState('');
   const [settings, setSettings] = useState<RoomSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(false);
+
+  const { user, isGuest, guestName, isLoading: isAuthLoading, setGuest, logout } = useAuthStore();
+  const [guestInputName, setGuestInputName] = useState('');
+  const [showEditName, setShowEditName] = useState(false);
+
+  // The actual player name to use in-game
+  const playerName = user ? user.displayName : guestName;
 
   useEffect(() => {
     connectSocket();
   }, []);
 
   const handleCreate = async () => {
-    if (!playerName.trim()) { setError('Enter your name'); return; }
+    if (!playerName?.trim()) { setError('Enter your name'); return; }
     setLoading(true);
     setError(null);
     try {
@@ -60,7 +70,7 @@ export default function Home() {
   };
 
   const handleJoin = async () => {
-    if (!playerName.trim()) { setError('Enter your name'); return; }
+    if (!playerName?.trim()) { setError('Enter your name'); return; }
     if (!joinCode.trim()) { setError('Enter room code'); return; }
     setLoading(true);
     setError(null);
@@ -75,6 +85,10 @@ export default function Home() {
 
   return (
     <div className="lobby-root">
+      {/* Show Welcome Dialog if they are not logged in AND not explicitly a guest, and not loading auth */}
+      {!isAuthLoading && !user && !isGuest && <WelcomeDialog />}
+      {showEditName && <ChangeNameModal onClose={() => setShowEditName(false)} />}
+
       <div className="lobby-bg-layer" />
 
       <FloatingCard suit="♠" style={{ top: '8%', left: '5%', transform: 'rotate(-15deg)' }} />
@@ -106,16 +120,32 @@ export default function Home() {
 
         {mode === 'menu' && (
           <div className="lobby-menu-buttons">
-            <div className="lobby-name-input-wrap">
-              <input
-                suppressHydrationWarning
-                className="lobby-name-input"
-                placeholder="Your Name"
-                value={playerName}
-                onChange={e => setPlayerName(e.target.value)}
-                maxLength={20}
-                autoFocus
-              />
+            {/* If they are a guest but haven't entered a name yet, prompt them. If user, just show welcome */}
+            <div className="lobby-name-input-wrap text-center">
+              {user ? (
+                <div className="flex flex-col items-center gap-2 mb-4">
+                  <div className="text-xl font-bold text-white">
+                    Welcome, {user.displayName}
+                  </div>
+                  <div className="text-sm font-semibold text-yellow-500 bg-yellow-500/10 px-3 py-1 rounded-full border border-yellow-500/20">
+                    ID: {user.shortId}
+                  </div>
+                  <button onClick={logout} className="text-xs text-gray-400 hover:text-white underline mt-1">Logout</button>
+                </div>
+              ) : (
+                <input
+                  suppressHydrationWarning
+                  className="lobby-name-input"
+                  placeholder="Your Name (Guest)"
+                  value={guestInputName}
+                  onChange={e => {
+                    setGuestInputName(e.target.value);
+                    setGuest(e.target.value);
+                  }}
+                  maxLength={20}
+                  autoFocus
+                />
+              )}
             </div>
 
             <button
@@ -142,6 +172,20 @@ export default function Home() {
               </div>
             </button>
 
+            {user && (
+              <button
+                suppressHydrationWarning
+                className="lobby-btn lobby-btn-secondary"
+                style={{ padding: '12px 20px' }}
+                onClick={() => { setError(null); setMode('friends'); }}>
+                <span className="lobby-btn-icon" style={{ fontSize: '20px' }}>👥</span>
+                <div className="lobby-btn-text">
+                  <span className="lobby-btn-label">Friends</span>
+                  <span className="lobby-btn-desc">Add and invite friends</span>
+                </div>
+              </button>
+            )}
+
             <button
               suppressHydrationWarning
               className="lobby-btn lobby-btn-secondary"
@@ -156,12 +200,59 @@ export default function Home() {
           </div>
         )}
 
+        {mode === 'friends' && (
+          <div className="lobby-panel">
+            <div className="lobby-panel-header">
+              <button className="lobby-back-btn" onClick={() => { setMode('menu'); setError(null); }}>←</button>
+              <h2 className="lobby-panel-title">Friends</h2>
+            </div>
+            
+            <div className="w-full">
+              <FriendsList />
+            </div>
+          </div>
+        )}
+
         {mode === 'settings' && (
           <div className="lobby-panel">
             <div className="lobby-panel-header">
               <button className="lobby-back-btn" onClick={() => { setMode('menu'); setError(null); }}>←</button>
               <h2 className="lobby-panel-title">Settings</h2>
             </div>
+
+            {user ? (
+              <div className="lobby-setting-group border-b border-gray-700/50 pb-5 mb-5">
+                <label className="lobby-setting-label">Account Profile</label>
+                <div className="flex items-center justify-between bg-white/5 rounded-xl p-4 mt-2">
+                  <div className="flex flex-col">
+                    <span className="text-white font-semibold text-lg">{user.displayName}</span>
+                    <span className="text-xs text-gray-400 font-medium">ID: {user.shortId}</span>
+                  </div>
+                  <button 
+                    onClick={() => setShowEditName(true)}
+                    className="bg-yellow-600/20 text-yellow-500 hover:bg-yellow-500 hover:text-black font-semibold text-sm px-4 py-2 rounded-lg transition-all border border-yellow-600/30"
+                  >
+                    Change Name
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="lobby-setting-group border-b border-gray-700/50 pb-5 mb-5">
+                <label className="lobby-setting-label">Account</label>
+                <div className="flex items-center justify-between bg-white/5 rounded-xl p-4 mt-2">
+                  <div className="flex flex-col">
+                    <span className="text-white font-semibold text-lg">Playing as Guest</span>
+                    <span className="text-xs text-gray-400 font-medium">Log in to add friends</span>
+                  </div>
+                  <button 
+                    onClick={() => router.push('/login')}
+                    className="bg-yellow-600 border border-yellow-500 text-black hover:bg-yellow-500 font-bold text-sm px-4 py-2 rounded-lg transition-all"
+                  >
+                    Log In / Sign Up
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="lobby-setting-group">
               <label className="lobby-setting-label">Card Back Design</label>
@@ -249,7 +340,7 @@ export default function Home() {
 
             {error && <div className="lobby-error">{error}</div>}
 
-            <button suppressHydrationWarning onClick={handleCreate} disabled={loading || !isConnected || !playerName.trim()} className="lobby-btn lobby-btn-primary lobby-btn-full">
+            <button suppressHydrationWarning onClick={handleCreate} disabled={loading || !isConnected || !playerName?.trim()} className="lobby-btn lobby-btn-primary lobby-btn-full">
               <span className="lobby-btn-icon">🚀</span>
               <div className="lobby-btn-text">
                 <span className="lobby-btn-label">{loading ? 'Creating...' : 'Start Room'}</span>
@@ -282,7 +373,7 @@ export default function Home() {
 
             <button suppressHydrationWarning
               onClick={handleJoin}
-              disabled={loading || !isConnected || joinCode.length !== 4 || !playerName.trim()}
+              disabled={loading || !isConnected || joinCode.length !== 4 || !playerName?.trim()}
               className="lobby-btn lobby-btn-primary lobby-btn-full">
               <span className="lobby-btn-icon">🎮</span>
               <div className="lobby-btn-text">

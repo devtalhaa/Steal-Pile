@@ -1,11 +1,50 @@
 import { Server, Socket } from 'socket.io';
 import { RoomManager } from './RoomManager';
 import { RoomSettings } from './types';
+import { admin } from './firebaseAdmin';
+
+// Maps socket.id -> uid
+const socketToUid = new Map<string, string>();
+// Maps uid -> socket.id
+const uidToSocket = new Map<string, string>();
+
+function broadcastOnlineUsers(io: Server) {
+  const onlineUids = Array.from(uidToSocket.keys());
+  io.emit('presence:online-users', onlineUids);
+}
 
 
 export function registerHandlers(io: Server, roomManager: RoomManager): void {
   io.on('connection', (socket: Socket) => {
     console.log(`Player connected: ${socket.id}`);
+
+    // ============ AUTH EVENTS ============
+    socket.on('auth:authenticate', async (data: { token: string }) => {
+      try {
+        const decodedToken = await admin.auth().verifyIdToken(data.token);
+        const uid = decodedToken.uid;
+        
+        socketToUid.set(socket.id, uid);
+        uidToSocket.set(uid, socket.id);
+        
+        socket.emit('auth:success');
+        broadcastOnlineUsers(io);
+      } catch (err) {
+        socket.emit('auth:error', { message: 'Invalid authentication token.' });
+      }
+    });
+
+    socket.on('game:invite', (data: { targetUid: string, fromName?: string | null }) => {
+      const targetSocketId = uidToSocket.get(data.targetUid);
+      const code = roomManager.getRoomCodeByPlayerId(socket.id);
+      
+      if (targetSocketId && code) {
+        io.to(targetSocketId).emit('game:receive-invite', {
+          roomCode: code,
+          fromName: data.fromName || 'A friend',
+        });
+      }
+    });
 
     // ============ ROOM EVENTS ============
 
@@ -229,6 +268,16 @@ export function registerHandlers(io: Server, roomManager: RoomManager): void {
 
     socket.on('disconnect', () => {
       console.log(`Player disconnected: ${socket.id}`);
+      
+      const uid = socketToUid.get(socket.id);
+      if (uid) {
+        socketToUid.delete(socket.id);
+        if (uidToSocket.get(uid) === socket.id) {
+          uidToSocket.delete(uid);
+          broadcastOnlineUsers(io);
+        }
+      }
+
       const result = roomManager.disconnectPlayer(socket.id);
       if (!result) return;
 
