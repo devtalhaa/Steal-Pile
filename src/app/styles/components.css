@@ -1,0 +1,140 @@
+.room-code {
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.3em;
+  font-size: 2rem;
+  font-weight: bold;
+  color: var(--gold);
+  text-shadow: 0 0 20px rgba(212, 168, 67, 0.6);
+}
+
+.casino-input {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(212, 168, 67, 0.3);
+  color: white;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s;
+  width: 100%;
+}
+
+.casino-input:focus {
+  border-color: var(--gold);
+  background: rgba(255,255,255,0.12);
+}
+
+.casino-input::placeholder {
+  color: rgba(255,255,255,0.35);
+}
+
+.btn-gold {
+  background: linear-gradient(135deg, #c8932a, #e8b84b, #c8932a);
+  color: #1a0e00;
+  font-weight: bold;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 4px 12px rgba(200, 147, 42, 0.4);
+  border: none;
+  letter-spacing: 0.05em;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-gold:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(200, 147, 42, 0.6);
+}
+
+.btn-gold:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-gold:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: rgba(255,255,255,0.7);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-ghost:hover {
+  border-color: rgba(255,255,255,0.5);
+  color: white;
+  background: rgba(255,255,255,0.05);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #7f1d1d, #b91c1c, #7f1d1d);
+  color: white;
+  font-weight: bold;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 4px 12px rgba(185, 28, 28, 0.4);
+  border: none;
+}
+
+.btn-danger:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(185, 28, 28, 0.6);
+}
+
+.card-size-md {
+  width: 72px;
+  height: 100px;
+}
+
+.card-size-lg {
+  width: 90px;
+  height: 126px;
+}
+
+@media (max-width: 1024px) or (max-height: 500px) {
+  .card-size-sm {
+    width: 38px !important;
+    height: 52px !important;
+  }
+  .card-size-md {
+    width: 46px !important;
+    height: 64px !important;
+  }
+  .card-size-lg {
+    width: 90px !important;
+    height: 126px !important;
+  }
+}
+
+@media (max-height: 420px) {
+  .card-size-sm {
+    width: 32px !important;
+    height: 44px !important;
+  }
+  .card-size-md {
+    width: 38px !important;
+    height: 52px !important;
+  }
+  .card-size-lg {
+    width: 82px !important;
+    height: 115px !important;
+  }
+}
