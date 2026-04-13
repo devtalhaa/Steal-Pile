@@ -5,10 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useSocket } from '@/hooks/useSocket';
 import { useGameActions } from '@/hooks/useGameActions';
 import { useGameStore } from '@/store/gameStore';
-import { useSettingsStore, CardBackStyle } from '@/store/settingsStore';
+import { useSettingsStore, CardBackStyle, TableThemeStyle } from '@/store/settingsStore';
 import { connectSocket } from '@/lib/socket';
 import { RoomSettings } from '@/types/game';
 import { CardBack } from '@/components/cards/CardBack';
+import { getTableThemeStyles } from '@/lib/constants';
 import { WelcomeDialog } from '@/components/lobby/WelcomeDialog';
 import { FriendsList } from '@/components/lobby/FriendsList';
 import { ChangeNameModal } from '@/components/lobby/ChangeNameModal';
@@ -47,6 +48,8 @@ export default function Home() {
   
   const storedStyle = useSettingsStore(s => s.cardBack);
   const setCardBack = useSettingsStore(s => s.setCardBack);
+  const tableTheme = useSettingsStore(s => s.tableTheme);
+  const setTableTheme = useSettingsStore(s => s.setTableTheme);
 
   const [mode, setMode] = useState<'menu' | 'create' | 'join' | 'settings' | 'friends' | 'link-email'>('menu');
   const [joinCode, setJoinCode] = useState('');
@@ -349,6 +352,66 @@ export default function Home() {
             )}
 
             <div className="lobby-setting-group">
+              <label className="lobby-setting-label">Game Table Theme</label>
+              <p className="text-xs text-white/50 mb-3 leading-tight">Choose the background table style for the game room.</p>
+              
+              {/* Table Style Preview Area */}
+              <div 
+                className="w-full h-32 rounded-2xl mb-4 relative overflow-hidden shadow-inner flex items-center justify-center border border-white/10"
+                style={{ backgroundColor: getTableThemeStyles(tableTheme).outerSpace }}
+              >
+                {/* The "Felt" pattern overly on outer space */}
+                <div className="absolute inset-0 opacity-[0.15]"
+                  style={{
+                    background: 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(0,0,0,0.5) 2px, rgba(0,0,0,0.5) 4px)'
+                  }} />
+
+                {/* Oval preview table */}
+                <div 
+                  className="w-[95%] h-[120%] rounded-[50%] relative flex items-center justify-center"
+                  style={{ 
+                    background: getTableThemeStyles(tableTheme).tableBg,
+                    boxShadow: `0 0 0 3px ${getTableThemeStyles(tableTheme).tableEdgeColor}, 0 0 0 6px ${getTableThemeStyles(tableTheme).tableEdgeColor}aa, 0 0 15px rgba(0,0,0,0.8)` 
+                  }} 
+                >
+                  <div className="absolute inset-0 rounded-[50%] opacity-20"
+                    style={{
+                      background: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(0,0,0,0.5) 4px, rgba(0,0,0,0.5) 8px)'
+                    }} />
+                  {/* Pseudo cards layout visualization */}
+                  <div className="w-[12px] h-[16px] bg-white rounded-[2px] absolute top-[25px]" />
+                  <div className="w-[12px] h-[16px] bg-white rounded-[2px] absolute left-[20px]" />
+                  <div className="w-[12px] h-[16px] bg-white rounded-[2px] absolute right-[20px]" />
+                  <div className="w-[12px] h-[16px] bg-white rounded-[2px] absolute bottom-[25px]" />
+                  <div className="flex gap-1 shadow-2xl z-10 w-[14px] h-[20px] bg-white rounded-[2px]" />
+                  <div className="flex gap-1 shadow-2xl z-10 w-[14px] h-[20px] bg-white rounded-[2px] ml-1" />
+                </div>
+              </div>
+              
+              <div className="relative mt-2">
+                <select 
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-yellow-500 transition-colors appearance-none cursor-pointer"
+                  value={tableTheme}
+                  onChange={(e) => setTableTheme(e.target.value as TableThemeStyle)}
+                >
+                  <option value="classic-green" className="bg-[#111] text-white">Classic Green</option>
+                  <option value="royal-burgundy" className="bg-[#111] text-white">Royal Burgundy</option>
+                  <option value="midnight-blue" className="bg-[#111] text-white">Midnight Blue</option>
+                  <option value="noir-black" className="bg-[#111] text-white">Noir Black (Dark)</option>
+                  <option value="obsidian-hex" className="bg-[#111] text-white">Obsidian Hex (Dark)</option>
+                  <option value="abyssal-carbon" className="bg-[#111] text-white">Abyssal Carbon (Dark)</option>
+                  <option value="crimson-shadow" className="bg-[#111] text-white">Crimson Shadow (Dark)</option>
+                  <option value="vintage-wood" className="bg-[#111] text-white">Vintage Wood 🪵</option>
+                  <option value="cyberpunk-neon" className="bg-[#111] text-white">Cyberpunk Neon ⚡</option>
+                  <option value="marble-highroller" className="bg-[#111] text-white">Marble Highroller 🏛️</option>
+                </select>
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 text-xs">
+                  ▼
+                </div>
+              </div>
+            </div>
+
+            <div className="lobby-setting-group mt-6">
               <label className="lobby-setting-label">Card Back Design</label>
               <p className="text-xs text-white/50 mb-3 leading-tight">Choose the back side of cards that you will see during the game.</p>
               

@@ -12,6 +12,7 @@ interface PlayerInit {
   name: string;
   team?: 'A' | 'B';
   seatIndex: number;
+  isBot?: boolean;
 }
 
 export class GameEngine {
@@ -46,6 +47,7 @@ export class GameEngine {
         team: p.team,
         seatIndex: p.seatIndex,
         isConnected: true,
+        isBot: p.isBot
       });
       this.turnOrder.push(p.id);
     }
@@ -424,6 +426,27 @@ export class GameEngine {
     if (player) player.isConnected = connected;
   }
 
+  getPlayerState(playerId: string): ServerPlayerState | undefined {
+    return this.players.get(playerId);
+  }
+
+  getPlayers(): Map<string, ServerPlayerState> {
+    return this.players;
+  }
+
+  getMiddleCards(): Card[] {
+    return this.middleCards;
+  }
+
+  getSettings(): RoomSettings {
+    return this.settings;
+  }
+
+  getTeamPileTop(team: 'A' | 'B'): Card | null {
+    const pile = this.getTeamPile(team);
+    return pile.length > 0 ? pile[pile.length - 1] : null;
+  }
+
   getClientState(forPlayerId: string): ClientGameState {
     const players: ClientPlayerView[] = [];
     for (const [pid, player] of this.players) {
@@ -531,11 +554,12 @@ export class GameEngine {
     this.advanceTurn();
   }
 
-  replacePlayerId(oldId: string, newId: string): boolean {
+  replacePlayerId(oldId: string, newId: string, newName?: string): boolean {
     const player = this.players.get(oldId);
     if (!player) return false;
 
     player.id = newId;
+    if (newName) player.name = newName;
     player.isConnected = true;
     this.players.delete(oldId);
     this.players.set(newId, player);

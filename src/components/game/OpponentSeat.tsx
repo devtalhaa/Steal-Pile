@@ -53,7 +53,8 @@ export function OpponentSeat({ player, isCurrentTurn, pileHighlighted }: Opponen
         </div>
 
         <div className="flex flex-col items-center">
-          <span className="text-[10px] font-semibold truncate max-w-[60px] text-white">
+          <span className="text-[10px] font-semibold truncate max-w-[60px] text-white flex items-center gap-0.5">
+            {player.isBot && <span>🤖</span>}
             {player.name}
           </span>
           {player.team && (

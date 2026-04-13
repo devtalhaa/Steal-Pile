@@ -21,6 +21,7 @@ export interface RoomPlayer {
   id: string;
   name: string;
   team?: 'A' | 'B';
+  isBot?: boolean;
 }
 
 export interface RoomState {
@@ -44,6 +45,7 @@ export interface ClientPlayerView {
   team?: 'A' | 'B';
   isConnected: boolean;
   seatIndex: number;
+  isBot?: boolean;
 }
 
 export interface ClientGameState {
@@ -114,6 +116,7 @@ export interface ServerToClientEvents {
   'auth:success': () => void;
   'auth:error': (data: { message: string }) => void;
   'admin:kicked': () => void;
+  'game:lenter-lock': (message: string) => void;
 }
 
 export interface ClientToServerEvents {
@@ -131,6 +134,7 @@ export interface ClientToServerEvents {
     callback: (res: { ok: true } | { ok: false; error: string }) => void
   ) => void;
   'room:leave': () => void;
+  'room:add-bot': (data: { code: string }) => void;
   'game:draw': () => void;
   'game:play-card': (data: { cardId: string }) => void;
   'game:next-round': () => void;
@@ -153,6 +157,14 @@ export interface ClientToServerEvents {
   ) => void;
   'admin:kick-player': (
     data: { roomCode: string; playerId: string },
+    callback: (res: { ok: true } | { ok: false; error: string }) => void
+  ) => void;
+  'admin:swap-player': (
+    data: { roomCode: string; oldPlayerId: string; targetUid: string },
+    callback: (res: { ok: true } | { ok: false; error: string }) => void
+  ) => void;
+  'admin:remove-friend': (
+    data: { userUid: string; friendUid: string },
     callback: (res: { ok: true } | { ok: false; error: string }) => void
   ) => void;
   'social:send-request': (

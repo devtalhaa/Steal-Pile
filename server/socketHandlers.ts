@@ -2,6 +2,7 @@ import { Server, Socket } from 'socket.io';
 import { RoomManager } from './RoomManager';
 import { RoomSettings } from './types';
 import { admin } from './firebaseAdmin';
+import { BotEngine } from './BotEngine';
 
 // Maps socket.id -> uid
 const socketToUid = new Map<string, string>();
@@ -91,12 +92,81 @@ export function registerHandlers(io: Server, roomManager: RoomManager): void {
         const targetSocket = io.sockets.sockets.get(data.playerId);
         if (targetSocket) {
           handleLeave(targetSocket, io, roomManager);
-          // Force client redirection
           targetSocket.emit('admin:kicked');
         }
         callback({ ok: true });
       } catch (err) {
         callback({ ok: false, error: 'Failed to kick player' });
+      }
+    });
+
+    socket.on('admin:swap-player', async (data: { roomCode: string; oldPlayerId: string; targetUid: string }, callback) => {
+      if (!adminSockets.has(socket.id)) return callback({ ok: false, error: 'Unauthorized' });
+
+      try {
+        const newSocketId = uidToSocket.get(data.targetUid);
+        // Player MUST be online to be swapped
+        if (!newSocketId) return callback({ ok: false, error: 'Target user is not currently online. They must be online to be swapped into a game.' });
+
+        // Fetch their user name
+        const userSnap = await admin.firestore().collection('users').doc(data.targetUid).get();
+        if (!userSnap.exists) return callback({ ok: false, error: 'Target user not found in database' });
+        const targetName = userSnap.data()?.username || 'Player';
+
+        const result = roomManager.swapPlayer(data.roomCode, data.oldPlayerId, newSocketId, targetName);
+        if (!result.success) return callback({ ok: false, error: result.error });
+
+        // Kick old player contextually
+        const oldSocket = io.sockets.sockets.get(data.oldPlayerId);
+        if (oldSocket) {
+             oldSocket.leave(data.roomCode);
+             oldSocket.emit('admin:kicked');
+        }
+
+        // Add new player to room
+        const newSocket = io.sockets.sockets.get(newSocketId);
+        if (newSocket) {
+            newSocket.join(data.roomCode);
+        }
+
+        const roomState = roomManager.getRoomState(data.roomCode);
+        if (roomState) io.to(data.roomCode).emit('room:state', roomState);
+
+        const room = roomManager.getRoomByCode(data.roomCode);
+        if (room && room.gameEngine) {
+            if (newSocket) {
+                const gameState = room.gameEngine.getClientState(newSocketId);
+                newSocket.emit('game:state', gameState);
+            }
+            broadcastGameState(io, room);
+            
+            if (room.gameEngine.getPhase() === 'playing' && room.gameEngine.getCurrentPlayerId() === newSocketId) {
+                if (newSocket) newSocket.emit('game:your-turn');
+            }
+        }
+
+        callback({ ok: true });
+      } catch (err) {
+        callback({ ok: false, error: 'Failed to swap player' });
+      }
+    });
+
+
+    socket.on('admin:remove-friend', async (data: { userUid: string; friendUid: string }, callback) => {
+      if (!adminSockets.has(socket.id)) return callback({ ok: false, error: 'Unauthorized' });
+
+      try {
+        const batch = admin.firestore().batch();
+        batch.update(admin.firestore().collection('users').doc(data.userUid), {
+          friends: admin.firestore.FieldValue.arrayRemove(data.friendUid)
+        });
+        batch.update(admin.firestore().collection('users').doc(data.friendUid), {
+          friends: admin.firestore.FieldValue.arrayRemove(data.userUid)
+        });
+        await batch.commit();
+        callback({ ok: true });
+      } catch (err: any) {
+        callback({ ok: false, error: err.message });
       }
     });
 
@@ -282,6 +352,19 @@ export function registerHandlers(io: Server, roomManager: RoomManager): void {
       }
     });
 
+    socket.on('room:add-bot', (data: { code: string }) => {
+      const code = roomManager.getRoomCodeByPlayerId(socket.id);
+      if (code !== data.code) return; // Only someone in the room can add a bot
+      const room = roomManager.getRoomByCode(code);
+      if (room?.hostId !== socket.id) return; // Only host can add bots
+
+      const result = roomManager.addBot(code);
+      if (result.success) {
+        const roomState = roomManager.getRoomState(code);
+        if (roomState) io.to(code).emit('room:state', roomState);
+      }
+    });
+
     socket.on('room:update-settings', (data: { settings: Partial<RoomSettings> }) => {
       const code = roomManager.getRoomCodeByPlayerId(socket.id);
       if (!code) return;
@@ -338,6 +421,12 @@ export function registerHandlers(io: Server, roomManager: RoomManager): void {
 
       // Start the turn timer for the first player
       room.gameEngine.startTurnTimer();
+
+      // Trigger bot if first player is a bot
+      const firstPlayerState = room.gameEngine.getPlayerState(firstPlayer);
+      if (firstPlayerState?.isBot) {
+        BotEngine.takeTurn(io, roomManager, code, room.gameEngine);
+      }
     });
 
     socket.on('room:leave', () => {
@@ -402,6 +491,11 @@ export function registerHandlers(io: Server, roomManager: RoomManager): void {
           room.gameEngine.startTurnTimer();
           const currentPlayer = room.gameEngine.getCurrentPlayerId();
           io.to(currentPlayer).emit('game:your-turn');
+
+          const currentPlayerState = room.gameEngine.getPlayerState(currentPlayer);
+          if (currentPlayerState?.isBot) {
+            BotEngine.takeTurn(io, roomManager, room.code, room.gameEngine);
+          }
         }
       }, 100);
     });
@@ -426,6 +520,11 @@ export function registerHandlers(io: Server, roomManager: RoomManager): void {
 
       // Start timer for first player of new round
       room.gameEngine.startTurnTimer();
+
+      const firstPlayerState = room.gameEngine.getPlayerState(currentPlayer);
+      if (firstPlayerState?.isBot) {
+        BotEngine.takeTurn(io, roomManager, room.code, room.gameEngine);
+      }
     });
 
     socket.on('game:reconnect', (data: { code: string; playerName: string }, callback) => {

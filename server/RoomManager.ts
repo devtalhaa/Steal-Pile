@@ -4,7 +4,7 @@ import { RoomSettings, RoomState, RoomPlayer } from './types';
 interface Room {
   code: string;
   hostId: string;
-  players: Map<string, { name: string; team?: 'A' | 'B' }>;
+  players: Map<string, { name: string; team?: 'A' | 'B'; isBot?: boolean }>;
   settings: RoomSettings;
   status: 'lobby' | 'in_game';
   gameEngine: GameEngine | null;
@@ -37,6 +37,27 @@ export class RoomManager {
 
     room.players.set(playerId, { name: playerName });
     this.playerToRoom.set(playerId, code);
+    return { success: true };
+  }
+
+  addBot(code: string): { success: boolean; error?: string } {
+    const room = this.rooms.get(code);
+    if (!room) return { success: false, error: 'Room not found' };
+    if (room.status === 'in_game') return { success: false, error: 'Game already in progress' };
+    if (room.players.size >= room.settings.maxPlayers) return { success: false, error: 'Room is full' };
+
+    let botIndex = 1;
+    let botId = `bot_${botIndex}`;
+    while (room.players.has(botId)) {
+      botIndex++;
+      botId = `bot_${botIndex}`;
+    }
+    
+    const botNames = ['Bot Alpha', 'Bot Beta', 'Bot Gamma', 'Bot Delta', 'Bot Echo', 'Bot Zeta'];
+    const playerName = botNames[(botIndex - 1) % botNames.length];
+
+    room.players.set(botId, { name: playerName, isBot: true });
+    this.playerToRoom.set(botId, code);
     return { success: true };
   }
 
@@ -202,7 +223,7 @@ export class RoomManager {
         else teamB.push(pid);
       }
 
-      const arranged: { id: string; name: string; team: 'A' | 'B'; seatIndex: number }[] = [];
+      const arranged: { id: string; name: string; team?: 'A' | 'B'; seatIndex: number; isBot?: boolean }[] = [];
       const maxLen = Math.max(teamA.length, teamB.length);
       let seatIdx = 0;
       for (let i = 0; i < maxLen; i++) {
@@ -212,6 +233,7 @@ export class RoomManager {
             name: room.players.get(teamA[i])!.name,
             team: 'A',
             seatIndex: seatIdx++,
+            isBot: room.players.get(teamA[i])!.isBot,
           });
         }
         if (i < teamB.length) {
@@ -220,6 +242,7 @@ export class RoomManager {
             name: room.players.get(teamB[i])!.name,
             team: 'B',
             seatIndex: seatIdx++,
+            isBot: room.players.get(teamB[i])!.isBot,
           });
         }
       }
@@ -231,6 +254,7 @@ export class RoomManager {
         id: pid,
         name: room.players.get(pid)!.name,
         seatIndex: i,
+        isBot: room.players.get(pid)!.isBot,
       }));
     }
   }
@@ -255,7 +279,7 @@ export class RoomManager {
 
     const players: RoomPlayer[] = [];
     for (const [pid, p] of room.players) {
-      players.push({ id: pid, name: p.name, team: p.team });
+      players.push({ id: pid, name: p.name, team: p.team, isBot: p.isBot });
     }
 
     return {
@@ -277,5 +301,33 @@ export class RoomManager {
       code = Math.floor(1000 + Math.random() * 9000).toString();
     } while (this.rooms.has(code));
     return code;
+  }
+
+  swapPlayer(code: string, oldSocketId: string, newSocketId: string, newName: string): { success: boolean; error?: string } {
+    const room = this.rooms.get(code);
+    if (!room) return { success: false, error: 'Room not found' };
+    
+    if (oldSocketId === newSocketId) return { success: false, error: 'Cannot swap player with themselves' };
+    if (!room.players.has(oldSocketId)) return { success: false, error: 'Player to replace is not in the room' };
+    if (room.players.has(newSocketId)) return { success: false, error: 'New player is already in this room' };
+
+    const playerData = room.players.get(oldSocketId)!;
+    playerData.name = newName;
+    
+    room.players.delete(oldSocketId);
+    room.players.set(newSocketId, playerData);
+
+    this.playerToRoom.delete(oldSocketId);
+    this.playerToRoom.set(newSocketId, code);
+
+    if (room.hostId === oldSocketId) {
+      room.hostId = newSocketId;
+    }
+
+    if (room.gameEngine) {
+      room.gameEngine.replacePlayerId(oldSocketId, newSocketId, newName);
+    }
+
+    return { success: true };
   }
 }

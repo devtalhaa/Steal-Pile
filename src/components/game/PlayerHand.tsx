@@ -99,10 +99,10 @@ export function PlayerHand({
           </div>
 
           {/* Squeezed hand with negative margins to overlap cards on mobile */}
-          <div className="relative flex items-end justify-center mt-2 sm:mt-4" style={{ minHeight: 120 }}>
+          <div className="relative flex items-end justify-center mt-2 sm:mt-4 max-sm:scale-[0.7] max-sm:origin-bottom" style={{ minHeight: 120 }}>
             <AnimatePresence mode="popLayout">
               {hand.map((card, i) => {
-                const overlapClass = i > 0 ? '-ml-8 sm:-ml-6 lg:-ml-2' : '';
+                const overlapClass = i > 0 ? '-ml-12 sm:-ml-6 lg:-ml-2' : '';
                 return (
                   <motion.div
                     layout

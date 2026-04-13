@@ -4,12 +4,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '@/store/gameStore';
 import { useGameActions } from '@/hooks/useGameActions';
+import { useSettingsStore } from '@/store/settingsStore';
+import { getTableThemeStyles } from '@/lib/constants';
 import { MiddleCards } from './MiddleCards';
 import { DrawPile } from './DrawPile';
 import { OpponentSeat } from './OpponentSeat';
 import { PlayerHand } from './PlayerHand';
 import { ScoreBoard } from './ScoreBoard';
 import { CardStack } from '@/components/cards/CardStack';
+import { getSocket } from '@/lib/socket';
 
 // ============ TURN TIMER COMPONENT ============
 
@@ -117,6 +120,9 @@ export function GameTable({ myPlayerId }: GameTableProps) {
   
   // Fullscreen prompt for mobile
   const [showFullscreenBtn, setShowFullscreenBtn] = useState(false);
+  
+  const tableTheme = useSettingsStore(s => s.tableTheme);
+  const themeStyles = getTableThemeStyles(tableTheme);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.innerWidth <= 1024) {
@@ -141,6 +147,21 @@ export function GameTable({ myPlayerId }: GameTableProps) {
     }
     setShowFullscreenBtn(false);
   };
+
+  const [lenterToast, setLenterToast] = useState<{ message: string; id: number } | null>(null);
+
+  useEffect(() => {
+    const socket = getSocket();
+    const handleLenterLock = (message: string) => {
+      setLenterToast({ message, id: Date.now() });
+      setTimeout(() => setLenterToast(null), 4000);
+    };
+
+    socket.on('game:lenter-lock', handleLenterLock);
+    return () => {
+      socket.off('game:lenter-lock', handleLenterLock);
+    };
+  }, []);
 
   // AUTO-DRAW: when it's my turn in draw phase, pull a card automatically
   useEffect(() => {
@@ -240,7 +261,7 @@ export function GameTable({ myPlayerId }: GameTableProps) {
     : 0;
 
   return (
-    <div className="h-screen w-full felt-bg relative overflow-hidden">
+    <div className="h-screen w-full felt-bg relative overflow-hidden" style={{ backgroundColor: themeStyles.outerSpace }}>
 
       {/* Oval table */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -252,7 +273,8 @@ export function GameTable({ myPlayerId }: GameTableProps) {
             height: '80vh',
             maxHeight: 540,
             borderRadius: '50%',
-            background: 'radial-gradient(ellipse at 50% 40%, #166534 0%, #0d5016 50%, #052e0a 100%)',
+            background: themeStyles.tableBg,
+            boxShadow: `0 0 0 6px ${themeStyles.tableEdgeColor}, 0 0 0 12px ${themeStyles.tableEdgeColor}aa, 0 0 40px rgba(0,0,0,0.8)`,
             position: 'relative',
           }}>
           <div className="absolute inset-0 rounded-full"
@@ -280,7 +302,7 @@ export function GameTable({ myPlayerId }: GameTableProps) {
           return (
             <div
               key={opponent.id}
-              className="absolute pointer-events-auto"
+              className="absolute pointer-events-auto max-sm:scale-[0.75]"
               style={{
                 left: `${pos.x}%`,
                 top: `${pos.y}%`,
@@ -299,7 +321,7 @@ export function GameTable({ myPlayerId }: GameTableProps) {
       </div>
 
       {/* Center: middle cards + draw pile + team piles */}
-      <div className="absolute pointer-events-none"
+      <div className="absolute pointer-events-none max-sm:scale-[0.85]"
         style={{
           top: '50%', left: '50%',
           transform: 'translate(-50%, -52%)',
@@ -400,7 +422,7 @@ export function GameTable({ myPlayerId }: GameTableProps) {
       </AnimatePresence>
 
       {/* Top left info: Player badge & Score board */}
-      <div className="absolute z-20 flex flex-col gap-2 pointer-events-auto"
+      <div className="absolute z-20 flex flex-col gap-2 pointer-events-auto max-sm:scale-[0.75] max-sm:origin-top-left"
         style={{ top: 'max(env(safe-area-inset-top), 12px)', left: 'max(env(safe-area-inset-left), 12px)' }}>
         {myPlayer && (
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full w-fit"
@@ -434,7 +456,7 @@ export function GameTable({ myPlayerId }: GameTableProps) {
 
       {/* Deck-empty badge — top right */}
       {deckEmpty && (
-        <div className="absolute z-20 px-3 py-1.5 rounded-xl text-xs font-bold"
+        <div className="absolute z-20 px-3 py-1.5 rounded-xl text-xs font-bold max-sm:scale-[0.75] max-sm:origin-top-right"
           style={{
             top: 'max(env(safe-area-inset-top), 12px)',
             right: 'max(env(safe-area-inset-right), 12px)',
@@ -472,7 +494,7 @@ export function GameTable({ myPlayerId }: GameTableProps) {
 
       {/* Waiting indicator — when it's someone else's turn */}
       {!isCurrentPlayerMe && (
-        <div className="absolute top-1/2 right-3 -translate-y-1/2 z-20">
+        <div className="absolute top-1/2 right-3 -translate-y-1/2 z-20 max-sm:scale-[0.75] max-sm:origin-right">
           <div className="px-3 py-2 rounded-xl text-xs text-center flex flex-col items-center gap-1.5"
             style={{
               background: 'rgba(0,0,0,0.65)',
@@ -535,6 +557,23 @@ export function GameTable({ myPlayerId }: GameTableProps) {
           Khoti is best played in Landscape mode. Please rotate your phone to continue playing!
         </p>
       </div>
+
+      <AnimatePresence>
+        {lenterToast && (
+          <motion.div
+            key={lenterToast.id}
+            initial={{ opacity: 0, y: -20, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="absolute top-16 left-1/2 -translate-x-1/2 z-[100] pointer-events-none"
+          >
+            <div className="bg-black/90 border border-yellow-500/50 shadow-[0_0_20px_rgba(234,179,8,0.3)] text-yellow-500 px-4 py-2 rounded-full font-bold text-xs flex items-center justify-center gap-2">
+              <span className="text-lg">🔒</span>
+              {lenterToast.message}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

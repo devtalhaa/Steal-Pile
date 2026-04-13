@@ -13,6 +13,7 @@ interface AdminUser {
   username?: string;
   shortId?: string;
   photoURL?: string;
+  friends?: string[];
 }
 
 interface AdminRoom {
@@ -30,6 +31,8 @@ export default function AdminDashboard() {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'users' | 'games'>('users');
   const [authenticated, setAuthenticated] = useState(false);
+  const [swapModalState, setSwapModalState] = useState<{ roomCode: string, oldPlayerId: string } | null>(null);
+  const [friendsModalState, setFriendsModalState] = useState<AdminUser | null>(null);
 
   useEffect(() => {
     if (sessionStorage.getItem('admin_authenticated') !== 'true') {
@@ -118,6 +121,46 @@ export default function AdminDashboard() {
         fetchData();
       } else {
         alert('Failed to kick player');
+      }
+    });
+  };
+
+  const confirmSwap = (targetUid: string) => {
+    if (!swapModalState) return;
+    if (!confirm('Are you sure you want to swap this user into the game context?')) return;
+    
+    const socket = getSocket();
+    socket.emit('admin:swap-player', { 
+      roomCode: swapModalState.roomCode,
+      oldPlayerId: swapModalState.oldPlayerId,
+      targetUid 
+    }, (res: any) => {
+      if (res.ok) {
+        setSwapModalState(null);
+        fetchData();
+        alert('Player successfully swapped!');
+      } else {
+        alert(`Failed to swap player: ${res.error}`);
+      }
+    });
+  };
+
+  const removeFriend = (userUid: string, friendUid: string) => {
+    if (!confirm('Are you sure you want to remove this friend connection?')) return;
+    
+    const socket = getSocket();
+    socket.emit('admin:remove-friend', { userUid, friendUid }, (res: any) => {
+      if (res.ok) {
+        // Optimistically update the modal user state since we are already viewing them
+        if (friendsModalState) {
+          setFriendsModalState({
+            ...friendsModalState,
+            friends: (friendsModalState.friends || []).filter(id => id !== friendUid)
+          });
+        }
+        fetchData();
+      } else {
+        alert(`Failed to remove friend: ${res.error}`);
       }
     });
   };
@@ -216,6 +259,7 @@ export default function AdminDashboard() {
                       <th className="px-8 py-4">User</th>
                       <th className="px-8 py-4">UID / ShortID</th>
                       <th className="px-8 py-4">Email</th>
+                      <th className="px-8 py-4 text-center">Friends</th>
                       <th className="px-8 py-4 text-center">Actions</th>
                     </tr>
                   </thead>
@@ -238,6 +282,14 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-8 py-5 text-sm text-gray-400 font-medium">
                           {u.email || <span className="italic opacity-30">None</span>}
+                        </td>
+                        <td className="px-8 py-5 text-center">
+                          <button
+                            onClick={() => setFriendsModalState(u)}
+                            className="bg-purple-500/10 hover:bg-purple-500 text-purple-500 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
+                          >
+                            {u.friends?.length || 0} Friends
+                          </button>
                         </td>
                         <td className="px-8 py-5 text-center">
                           <button 
@@ -287,12 +339,20 @@ export default function AdminDashboard() {
                             </div>
                             <span className="text-sm font-bold text-white">{p.name} {p.id === room.hostId && <span className="text-yellow-500 text-[10px] ml-1">★</span>}</span>
                           </div>
-                          <button 
-                            onClick={() => kickPlayer(room.code, p.id)}
-                            className="text-[9px] font-black uppercase text-red-500 hover:bg-red-500/10 px-2 py-1 rounded transition-colors"
-                          >
-                            Kick
-                          </button>
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => setSwapModalState({ roomCode: room.code, oldPlayerId: p.id })}
+                              className="text-[9px] font-black uppercase text-blue-500 hover:bg-blue-500/10 px-2 py-1 rounded transition-colors"
+                            >
+                              Swap
+                            </button>
+                            <button 
+                              onClick={() => kickPlayer(room.code, p.id)}
+                              className="text-[9px] font-black uppercase text-red-500 hover:bg-red-500/10 px-2 py-1 rounded transition-colors"
+                            >
+                              Kick
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -300,6 +360,124 @@ export default function AdminDashboard() {
                 </div>
               ))}
             </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Swap Modal */}
+        <AnimatePresence>
+          {swapModalState && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setSwapModalState(null)}
+                className="absolute inset-0 bg-black/80 backdrop-blur-md"
+              />
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                className="relative w-full max-w-lg bg-[#111] border border-white/10 rounded-3xl overflow-hidden shadow-2xl"
+                style={{ maxHeight: '80vh' }}
+              >
+                <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                  <h2 className="text-xl font-black text-white uppercase tracking-tight">Select Replacement Player</h2>
+                  <button 
+                    onClick={() => setSwapModalState(null)}
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 text-gray-400 hover:text-white transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="p-4 overflow-y-auto max-h-[60vh] custom-scrollbar space-y-2">
+                  {users.map(u => (
+                    <div key={u.uid} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center text-yellow-500 font-bold overflow-hidden">
+                          {u.photoURL ? <img src={u.photoURL} className="w-full h-full object-cover" /> : (u.username?.charAt(0) || '?')}
+                        </div>
+                        <div>
+                          <div className="font-bold text-white text-sm">{u.username || 'Anonymous'}</div>
+                          <div className="text-[10px] text-gray-400 font-bold uppercase">{u.shortId || u.uid.substring(0, 8)}</div>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => confirmSwap(u.uid)}
+                        className="px-4 py-2 bg-blue-500/20 text-blue-400 hover:bg-blue-500 hover:text-white text-[10px] font-black uppercase tracking-widest rounded-lg transition-all"
+                      >
+                        Swap In
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Friends View Modal */}
+        <AnimatePresence>
+          {friendsModalState && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setFriendsModalState(null)}
+                className="absolute inset-0 bg-black/80 backdrop-blur-md"
+              />
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                className="relative w-full max-w-lg bg-[#111] border border-white/10 rounded-3xl overflow-hidden shadow-2xl"
+                style={{ maxHeight: '80vh' }}
+              >
+                <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-black text-white uppercase tracking-tight">Friends List</h2>
+                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{friendsModalState.username}'s Connections</p>
+                  </div>
+                  <button 
+                    onClick={() => setFriendsModalState(null)}
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 text-gray-400 hover:text-white transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="p-4 overflow-y-auto max-h-[60vh] custom-scrollbar space-y-2">
+                  {(!friendsModalState.friends || friendsModalState.friends.length === 0) ? (
+                    <div className="p-8 text-center text-gray-500 font-bold uppercase tracking-widest text-xs">
+                      No friends found.
+                    </div>
+                  ) : (
+                    friendsModalState.friends.map(friendUid => {
+                      const friendData = users.find(u => u.uid === friendUid);
+                      return (
+                        <div key={friendUid} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-500 font-bold overflow-hidden">
+                              {friendData?.photoURL ? <img src={friendData.photoURL} className="w-full h-full object-cover" /> : (friendData?.username?.charAt(0) || '?')}
+                            </div>
+                            <div>
+                              <div className="font-bold text-white text-sm">{friendData?.username || 'Unknown User'}</div>
+                              <div className="text-[10px] text-gray-400 font-bold uppercase">{friendData?.shortId || friendUid.substring(0, 8)}</div>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={() => removeFriend(friendsModalState.uid, friendUid)}
+                            className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white text-[10px] font-black uppercase tracking-widest rounded-lg transition-all"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </motion.div>
+            </div>
           )}
         </AnimatePresence>
       </main>

@@ -100,6 +100,14 @@ export function useGameActions() {
     socket.emit('game:next-round');
   }, []);
 
+  const addBot = useCallback(() => {
+    const socket = getSocket();
+    const code = sessionStorage.getItem('khoti_room_code');
+    if (code) {
+      socket.emit('room:add-bot', { code });
+    }
+  }, []);
+
   return {
     createRoom,
     joinRoom,
@@ -110,5 +118,6 @@ export function useGameActions() {
     drawCard,
     playCard,
     requestNextRound,
+    addBot,
   };
 }

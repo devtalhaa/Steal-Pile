@@ -20,6 +20,7 @@ export interface RoomPlayer {
   id: string;
   name: string;
   team?: 'A' | 'B';
+  isBot?: boolean;
 }
 
 export interface RoomState {
@@ -42,6 +43,7 @@ export interface ClientPlayerView {
   team?: 'A' | 'B';
   isConnected: boolean;
   seatIndex: number;
+  isBot?: boolean;
 }
 
 export interface ClientGameState {
@@ -104,4 +106,7 @@ export interface ServerPlayerState {
   team?: 'A' | 'B';
   seatIndex: number;
   isConnected: boolean;
+  socketId?: string; // missing in previous or added now for bots it's empty
+  isBot?: boolean;
 }
+

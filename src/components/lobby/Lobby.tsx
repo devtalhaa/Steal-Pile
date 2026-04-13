@@ -29,7 +29,7 @@ export function Lobby({ code }: LobbyProps) {
   const setError = useGameStore(s => s.setError);
   const { user } = useAuthStore();
 
-  const { startGame, leaveRoom, updateSettings, assignTeams } = useGameActions();
+  const { startGame, leaveRoom, updateSettings, assignTeams, addBot } = useGameActions();
   const [startLoading, setStartLoading] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
 
@@ -167,7 +167,10 @@ export function Lobby({ code }: LobbyProps) {
                     {player.name.charAt(0).toUpperCase()}
                   </div>
 
-                  <div className="text-sm font-semibold truncate text-center w-full mt-1 text-white">{player.name}</div>
+                  <div className="text-sm font-semibold truncate text-center w-full mt-1 text-white flex items-center justify-center gap-1">
+                    {player.isBot && <span>🤖</span>}
+                    {player.name}
+                  </div>
 
                   <div className="flex items-center gap-1">
                     {player.id === room.hostId && <span className="text-[9px] uppercase tracking-wider text-yellow-400 font-bold bg-yellow-400/10 px-1.5 py-0.5 rounded">Host</span>}
@@ -187,11 +190,21 @@ export function Lobby({ code }: LobbyProps) {
 
             {/* Empty slots */}
             {Array.from({ length: settings.maxPlayers - players.length }).map((_, i) => (
-              <div key={i} className="p-3 rounded-xl border border-dashed border-white/15 bg-white/5 flex flex-col items-center justify-center gap-2 opacity-50">
+              <div key={i} className="p-3 rounded-xl border border-dashed border-white/15 bg-white/5 flex flex-col items-center justify-center gap-2 opacity-50 relative group overflow-hidden">
                 <div className="w-10 h-10 rounded-full border border-dashed border-white/20 flex flex-col justify-center items-center">
                   <span className="text-white/40 text-lg leading-none">+</span>
                 </div>
                 <span className="text-[11px] text-white/40 uppercase tracking-wider">Empty</span>
+                
+                {isHost && (
+                  <button 
+                    onClick={() => addBot()}
+                    className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl border border-yellow-500/30 w-full h-full"
+                  >
+                    <span className="text-xl">🤖</span>
+                    <span className="text-[9px] uppercase font-bold text-yellow-500 mt-1">Add Bot</span>
+                  </button>
+                )}
               </div>
             ))}
           </div>
