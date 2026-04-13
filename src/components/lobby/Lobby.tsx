@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '@/store/gameStore';
 import { useGameActions } from '@/hooks/useGameActions';
@@ -8,17 +8,10 @@ import { useRouter } from 'next/navigation';
 import { RoomPlayer } from '@/types/game';
 import { useAuthStore } from '@/store/authStore';
 import { FriendsList } from './FriendsList';
+import { getSocket } from '@/lib/socket';
 
 interface LobbyProps {
   code: string;
-}
-
-function FloatingCard({ suit, style }: { suit: string; style: React.CSSProperties }) {
-  return (
-    <div className="absolute pointer-events-none select-none" style={{ ...style, fontSize: 40, opacity: 0.06 }}>
-      {suit}
-    </div>
-  );
 }
 
 export function Lobby({ code }: LobbyProps) {
@@ -29,17 +22,35 @@ export function Lobby({ code }: LobbyProps) {
   const setError = useGameStore(s => s.setError);
   const { user } = useAuthStore();
 
-  const { startGame, leaveRoom, updateSettings, assignTeams, addBot } = useGameActions();
+  const { startGame, leaveRoom, updateSettings, assignTeams, addBot, kickPlayer } = useGameActions();
   const [startLoading, setStartLoading] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
 
+  useEffect(() => {
+    const socket = getSocket();
+    const handleKicked = () => {
+      leaveRoom();
+      router.push('/');
+    };
+    const handleDissolved = () => {
+      leaveRoom();
+      router.push('/');
+    };
+    socket.on('room:kicked', handleKicked);
+    socket.on('room:dissolved', handleDissolved);
+    return () => {
+      socket.off('room:kicked', handleKicked);
+      socket.off('room:dissolved', handleDissolved);
+    };
+  }, [leaveRoom, router]);
+
   if (!room) {
     return (
-      <div className="lobby-root">
+      <div className="gl-layout-full">
         <div className="lobby-bg-layer" />
-        <div className="text-center z-10">
-          <div className="text-4xl animate-pulse mb-4">🃏</div>
-          <p className="gold-text text-lg">Loading lobby...</p>
+        <div style={{ gridArea: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
+          <div style={{ fontSize: 48 }} className="animate-pulse">🃏</div>
+          <p className="gold-text" style={{ fontSize: 16, letterSpacing: '0.08em' }}>Loading lobby...</p>
         </div>
       </div>
     );
@@ -85,104 +96,92 @@ export function Lobby({ code }: LobbyProps) {
   const hasEvenPlayers = players.length % 2 === 0 && players.length >= 2;
 
   return (
-    <div className="lobby-root justify-start" style={{ padding: '20px 0' }}>
+    <div className="gl-layout-full">
       <div className="lobby-bg-layer" />
-      
-      <FloatingCard suit="♠" style={{ top: '8%', left: '5%', transform: 'rotate(-15deg)' }} />
-      <FloatingCard suit="♥" style={{ top: '15%', right: '8%', transform: 'rotate(20deg)' }} />
-      <FloatingCard suit="♣" style={{ bottom: '20%', left: '10%', transform: 'rotate(10deg)' }} />
-      <FloatingCard suit="♦" style={{ bottom: '12%', right: '6%', transform: 'rotate(-22deg)' }} />
 
-      <div className="lobby-content" style={{ width: '100%', maxWidth: '440px', paddingTop: 32, paddingBottom: 32 }}>
-        
-        {/* Header (Smaller than main menu) */}
-        <div className="text-center mb-2">
-          <h1 className="text-2xl font-bold gold-text" style={{ letterSpacing: '0.1em' }}>WAITING ROOM</h1>
-          <p className="text-gray-400 text-xs uppercase tracking-widest mt-1">Get ready to play</p>
+      {/* Top Bar */}
+      <header className="gl-topbar">
+        <button className="gl-back-btn" onClick={handleLeave}>←</button>
+        <div className="gl-brand">
+          <h1 className="gl-brand-name" style={{ fontSize: '17px', letterSpacing: '0.1em' }}>WAITING ROOM</h1>
         </div>
+        <div className="gl-topbar-right">
+          <span className="gl-conn-text" style={{ fontSize: 11, color: 'rgba(212,168,67,0.8)', fontWeight: 700, letterSpacing: '0.18em' }}>{code}</span>
+        </div>
+      </header>
 
-        {/* Room code card */}
-        <div className="lobby-panel" style={{ padding: '16px', alignItems: 'center' }}>
-          <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-1">Room Code — Share with friends</p>
-          <div className="room-code text-4xl">{code}</div>
-          <div className="flex gap-2 mt-2">
+      {/* Center Scrollable Content */}
+      <main className="wr-center">
+
+        {/* Room Code + Share Row */}
+        <div className="wr-code-row">
+          <div className="wr-code-block">
+            <span className="wr-code-label">Room Code</span>
+            <span className="wr-code-val">{code}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
             <button
               onClick={() => navigator.clipboard.writeText(code)}
-              className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 bg-white/5 rounded-lg hover:bg-white/10 hover:text-white transition-all border border-white/10">
-              📋 Copy Code
+              className="wr-action-pill">
+              📋 Copy
             </button>
             <button
               onClick={() => setShowInviteModal(true)}
-              className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-yellow-500 bg-yellow-500/10 rounded-lg hover:bg-yellow-500/20 transition-all border border-yellow-500/20">
-              👥 Invite Friends
+              className="wr-action-pill wr-action-pill-gold">
+              👥 Invite
             </button>
           </div>
         </div>
 
-        {/* Players grid */}
-        <div className="lobby-panel flex flex-col gap-3">
-          <div className="flex items-center justify-between pb-2 border-b border-white/5">
-            <h2 className="font-bold text-xs uppercase tracking-widest gold-text">
-              Players ({players.length}/{settings.maxPlayers})
-            </h2>
+        {/* Players Grid */}
+        <div className="wr-section">
+          <div className="wr-section-header">
+            <span className="wr-section-title">Players ({players.length}/{settings.maxPlayers})</span>
             {isHost && settings.teamMode && players.length >= 2 && (
-              <button onClick={handleAutoAssignTeams} className="text-[10px] text-white/60 hover:text-white uppercase tracking-wider bg-white/5 px-2 py-1 rounded border border-white/10 transition-colors">
-                Auto-assign 
+              <button onClick={handleAutoAssignTeams} className="wr-action-pill" style={{ fontSize: 9 }}>
+                Auto-assign
               </button>
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="wr-players-grid">
             <AnimatePresence>
               {players.map((player, i) => (
                 <motion.div
                   key={player.id}
-                  initial={{ scale: 0.9, opacity: 0 }}
+                  initial={{ scale: 0.88, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.9, opacity: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  onClick={() => togglePlayerTeam(player)}
-                  className={`relative p-3 rounded-xl border flex flex-col items-center gap-1 transition-all ${
-                    isHost && settings.teamMode ? 'cursor-pointer hover:bg-white/10' : ''
-                  }`}
-                  style={{
-                    background: player.team
-                      ? player.team === 'A'
-                        ? 'rgba(29,78,216,0.15)'
-                        : 'rgba(185,28,28,0.15)'
-                      : 'rgba(255,255,255,0.04)',
-                    borderColor: player.id === myPlayerId
-                        ? 'rgba(212,168,67,0.4)'
-                        : player.team
-                          ? player.team === 'A' ? 'rgba(29,78,216,0.25)' : 'rgba(185,28,28,0.25)'
-                          : 'rgba(255,255,255,0.08)',
-                  }}>
-                  
-                  {/* Avatar */}
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold shadow-inner ${
-                    player.team === 'A' ? 'bg-blue-600/80 text-white border-2 border-blue-400/50' 
-                    : player.team === 'B' ? 'bg-red-600/80 text-white border-2 border-red-400/50' 
-                    : 'bg-white/10 text-white border border-white/20'
-                  }`}>
+                  exit={{ scale: 0.88, opacity: 0 }}
+                  transition={{ delay: i * 0.05, type: 'spring', stiffness: 300, damping: 22 }}
+                  className={`wr-player-card ${player.team === 'A' ? 'team-a-card' : player.team === 'B' ? 'team-b-card' : ''} ${player.id === myPlayerId ? 'me-card' : ''}`}
+                  onClick={() => settings.teamMode && isHost ? togglePlayerTeam(player) : undefined}
+                  style={{ cursor: isHost && settings.teamMode ? 'pointer' : 'default' }}
+                >
+                  <div className={`wr-avatar ${player.team === 'A' ? 'wr-avatar-a' : player.team === 'B' ? 'wr-avatar-b' : ''}`}>
                     {player.name.charAt(0).toUpperCase()}
                   </div>
-
-                  <div className="text-sm font-semibold truncate text-center w-full mt-1 text-white flex items-center justify-center gap-1">
+                  <div className="wr-player-name">
                     {player.isBot && <span>🤖</span>}
                     {player.name}
                   </div>
-
-                  <div className="flex items-center gap-1">
-                    {player.id === room.hostId && <span className="text-[9px] uppercase tracking-wider text-yellow-400 font-bold bg-yellow-400/10 px-1.5 py-0.5 rounded">Host</span>}
-                    {player.id === myPlayerId && <span className="text-[9px] uppercase tracking-wider text-white/50">(You)</span>}
+                  <div className="wr-player-badges">
+                    {player.id === room.hostId && <span className="wr-badge-host">HOST</span>}
+                    {player.id === myPlayerId && <span className="wr-badge-you">YOU</span>}
                   </div>
-
                   {settings.teamMode && (
-                    <div className="absolute top-2 right-2 text-[9px] font-bold">
-                      {player.team === 'A' ? <span className="text-blue-400">TEAM A</span> 
-                      : player.team === 'B' ? <span className="text-red-400">TEAM B</span> 
-                      : <span className="text-gray-500">?</span>}
+                    <div className="wr-team-tag">
+                      {player.team === 'A' && <span style={{ color: '#60a5fa' }}>A</span>}
+                      {player.team === 'B' && <span style={{ color: '#f87171' }}>B</span>}
+                      {!player.team && <span style={{ color: 'rgba(255,255,255,0.25)' }}>?</span>}
                     </div>
+                  )}
+                  {isHost && player.id !== myPlayerId && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); kickPlayer(player.id); }}
+                      className="wr-kick-btn"
+                      title="Kick player">
+                      ✕
+                    </button>
                   )}
                 </motion.div>
               ))}
@@ -190,85 +189,73 @@ export function Lobby({ code }: LobbyProps) {
 
             {/* Empty slots */}
             {Array.from({ length: settings.maxPlayers - players.length }).map((_, i) => (
-              <div key={i} className="p-3 rounded-xl border border-dashed border-white/15 bg-white/5 flex flex-col items-center justify-center gap-2 opacity-50 relative group overflow-hidden">
-                <div className="w-10 h-10 rounded-full border border-dashed border-white/20 flex flex-col justify-center items-center">
-                  <span className="text-white/40 text-lg leading-none">+</span>
-                </div>
-                <span className="text-[11px] text-white/40 uppercase tracking-wider">Empty</span>
-                
+              <div key={i} className="wr-empty-slot group">
+                <div className="wr-empty-avatar">+</div>
+                <span className="wr-empty-label">Empty</span>
                 {isHost && (
-                  <button 
-                    onClick={() => addBot()}
-                    className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl border border-yellow-500/30 w-full h-full"
-                  >
-                    <span className="text-xl">🤖</span>
-                    <span className="text-[9px] uppercase font-bold text-yellow-500 mt-1">Add Bot</span>
+                  <button onClick={() => addBot()} className="wr-add-bot-overlay">
+                    <span style={{ fontSize: 20 }}>🤖</span>
+                    <span className="wr-add-bot-label">Add Bot</span>
                   </button>
                 )}
               </div>
             ))}
           </div>
-          
-          {/* Team summary inside same panel */}
+
+          {/* Team summary */}
           {settings.teamMode && (teamA.length > 0 || teamB.length > 0) && (
-            <div className="grid grid-cols-2 gap-3 mt-2 border-t border-white/5 pt-4">
-              <div className="bg-blue-900/20 border border-blue-500/20 rounded-lg p-3">
-                <div className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-2">Team A</div>
-                <div className="flex flex-col gap-1">
-                  {teamA.length > 0 ? teamA.map(p => <div key={p.id} className="text-xs text-blue-100 truncate">{p.name}</div>) : <div className="text-xs text-blue-400/40 italic">Empty</div>}
-                </div>
+            <div className="wr-teams-row">
+              <div className="wr-team-panel wr-team-a">
+                <div className="wr-team-label">Team A</div>
+                {teamA.length > 0 ? teamA.map(p => <div key={p.id} className="wr-team-member">{p.name}</div>) : <div className="wr-team-empty">Empty</div>}
               </div>
-              <div className="bg-red-900/20 border border-red-500/20 rounded-lg p-3">
-                <div className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-2">Team B</div>
-                <div className="flex flex-col gap-1">
-                  {teamB.length > 0 ? teamB.map(p => <div key={p.id} className="text-xs text-red-100 truncate">{p.name}</div>) : <div className="text-xs text-red-400/40 italic">Empty</div>}
-                </div>
+              <div className="wr-team-panel wr-team-b">
+                <div className="wr-team-label">Team B</div>
+                {teamB.length > 0 ? teamB.map(p => <div key={p.id} className="wr-team-member">{p.name}</div>) : <div className="wr-team-empty">Empty</div>}
               </div>
             </div>
           )}
         </div>
 
-        {/* Settings (host only can edit) */}
+        {/* Settings */}
         {isHost ? (
-          <div className="lobby-panel flex flex-col gap-4">
-            <h2 className="font-bold text-xs uppercase tracking-widest text-white/50 border-b border-white/5 pb-2">Game Settings</h2>
+          <div className="wr-section">
+            <div className="wr-section-header">
+              <span className="wr-section-title">Game Settings</span>
+            </div>
 
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-white/80">Deck Size</span>
-                <div className="flex gap-2 bg-white/5 p-1 rounded-lg border border-white/10">
+            <div className="wr-settings-list">
+              <div className="wr-setting-row">
+                <span className="wr-setting-name">Deck Size</span>
+                <div className="wr-toggle-group">
                   {([1, 2] as const).map(n => (
                     <button key={n}
                       onClick={() => updateSettings({ deckCount: n })}
-                      className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
-                        settings.deckCount === n ? 'bg-gradient-to-br from-[#b8860b] to-[#d4a843] text-[#1a0e00]' : 'text-white/60 hover:bg-white/10'
-                      }`}>
+                      className={`wr-toggle-opt ${settings.deckCount === n ? 'active' : ''}`}>
                       {n === 1 ? '1 Deck' : '2 Decks'}
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-white/80">Max Players</span>
-                <div className="flex bg-white/5 p-1 rounded-lg border border-white/10">
+              <div className="wr-setting-row">
+                <span className="wr-setting-name">Max Players</span>
+                <div className="wr-toggle-group">
                   {[2, 3, 4, 5, 6, 7, 8].map(n => (
                     <button key={n}
                       onClick={() => updateSettings({ maxPlayers: n })}
-                      className={`w-7 h-7 flex items-center justify-center rounded text-xs font-bold transition-all ${
-                        settings.maxPlayers === n ? 'bg-gradient-to-br from-[#b8860b] to-[#d4a843] text-[#1a0e00] shadow-md' : 'text-white/60 hover:bg-white/10'
-                      }`}>
+                      className={`wr-toggle-opt wr-toggle-opt-sm ${settings.maxPlayers === n ? 'active' : ''}`}>
                       {n}
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-1 border-t border-white/5">
-                <div className="flex flex-col">
-                  <span className="text-sm font-semibold text-white/80">Team Mode</span>
+              <div className="wr-setting-row" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 12, marginTop: 4 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span className="wr-setting-name">Team Mode</span>
                   {settings.teamMode && !hasEvenPlayers && (
-                    <span className="text-[10px] text-yellow-500 uppercase tracking-wider mt-0.5">⚠ Need even players</span>
+                    <span style={{ fontSize: 9, color: '#eab308', textTransform: 'uppercase', letterSpacing: '0.06em' }}>⚠ Need even players</span>
                   )}
                 </div>
                 <button
@@ -279,100 +266,78 @@ export function Lobby({ code }: LobbyProps) {
               </div>
 
               {settings.teamMode && (
-                <div className="flex items-center justify-between pt-1 opacity-90 transition-opacity">
-                  <span className="text-sm font-semibold text-white/80">Target Owing Score</span>
-                  <div className="flex items-center bg-white/5 rounded border border-white/10 p-0.5">
-                    <button onClick={() => updateSettings({ targetScore: Math.max(10, settings.targetScore - 5) })}
-                      className="w-8 h-8 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 rounded-l transition-colors">−</button>
-                    <span className="font-bold gold-text text-sm w-10 text-center">{settings.targetScore}</span>
-                    <button onClick={() => updateSettings({ targetScore: settings.targetScore + 5 })}
-                      className="w-8 h-8 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 rounded-r transition-colors">+</button>
+                <div className="wr-setting-row">
+                  <span className="wr-setting-name">Target Score</span>
+                  <div className="wr-stepper">
+                    <button onClick={() => updateSettings({ targetScore: Math.max(10, settings.targetScore - 5) })} className="wr-stepper-btn">−</button>
+                    <span className="wr-stepper-val gold-text">{settings.targetScore}</span>
+                    <button onClick={() => updateSettings({ targetScore: settings.targetScore + 5 })} className="wr-stepper-btn">+</button>
                   </div>
                 </div>
               )}
             </div>
           </div>
         ) : (
-          <div className="lobby-panel p-4 flex flex-wrap gap-2 justify-center">
-            <span className="bg-white/10 border border-white/20 text-white/80 px-3 py-1.5 rounded-full text-xs font-bold">
-              🃏 {settings.deckCount === 1 ? '1 Deck' : '2 Decks'}
-            </span>
-            <span className="bg-white/10 border border-white/20 text-white/80 px-3 py-1.5 rounded-full text-xs font-bold">
-              👥 Max {settings.maxPlayers}
-            </span>
-            {settings.teamMode && (
-              <span className="bg-gradient-to-r from-blue-900/40 to-red-900/40 border border-yellow-500/30 text-yellow-500 px-3 py-1.5 rounded-full text-xs font-bold shadow-[0_0_10px_rgba(234,179,8,0.2)]">
-                ⚔ Team Mode (Target: {settings.targetScore})
-              </span>
-            )}
+          <div className="wr-section">
+            <div className="wr-chips-row">
+              <span className="wr-chip">🃏 {settings.deckCount === 1 ? '1 Deck' : '2 Decks'}</span>
+              <span className="wr-chip">👥 Max {settings.maxPlayers}</span>
+              {settings.teamMode && (
+                <span className="wr-chip wr-chip-gold">⚔ Team Mode · {settings.targetScore} pts</span>
+              )}
+            </div>
           </div>
         )}
 
-        {/* Error */}
-        {error && <div className="lobby-error w-full">{error}</div>}
+        {error && <div className="lobby-error" style={{ width: '100%' }}>{error}</div>}
+      </main>
 
-        {/* Action Buttons */}
-        <div className="flex flex-col gap-3 w-full mt-2">
-          {isHost ? (
-            <button
-              onClick={handleStart}
-              disabled={startLoading || players.length < 2 || (settings.teamMode && !hasEvenPlayers)}
-              className="lobby-btn lobby-btn-primary lobby-btn-full">
-              <span className="lobby-btn-icon">▶</span>
-              <div className="lobby-btn-text">
-                <span className="lobby-btn-label">{startLoading ? 'Starting...' : 'Start Game'}</span>
-                <span className="lobby-btn-desc">{players.length} Players connected</span>
-              </div>
-            </button>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-4 px-6 bg-white/5 border border-white/10 rounded-2xl gap-2">
-              <span className="animate-spin text-xl opacity-70">⏳</span>
-              <div className="text-sm font-semibold text-white/70">Waiting for host to start...</div>
-            </div>
-          )}
-          
-          <button onClick={handleLeave} className="lobby-btn lobby-btn-secondary lobby-btn-full opacity-80 hover:opacity-100">
-            <span className="lobby-btn-icon text-xl">🚪</span>
-            <div className="lobby-btn-text">
-              <span className="lobby-btn-label">Leave Room</span>
-            </div>
+      {/* Footer Actions */}
+      <footer className="gl-footer">
+        {isHost ? (
+          <button
+            onClick={handleStart}
+            disabled={startLoading || players.length < 2 || (settings.teamMode && !hasEvenPlayers)}
+            className="gl-start-btn" style={{ flex: 1, maxWidth: 340 }}>
+            <span className="gl-start-btn-icon">▶</span>
+            <span>{startLoading ? 'Starting...' : `START GAME · ${players.length}P`}</span>
           </button>
-        </div>
+        ) : (
+          <div className="wr-waiting-pill">
+            <span style={{ animation: 'spin 2s linear infinite', display: 'inline-block' }}>⏳</span>
+            <span>Waiting for host to start...</span>
+          </div>
+        )}
+        <button onClick={handleLeave} className="gl-footer-btn gl-logout-btn" style={{ flexShrink: 0 }}>
+          🚪 Leave
+        </button>
+      </footer>
 
-      </div>
-
-      {/* Invite Friends Modal */}
+      {/* Invite Modal */}
       <AnimatePresence>
         {showInviteModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setShowInviteModal(false)}
               className="absolute inset-0 bg-black/80 backdrop-blur-md"
             />
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               className="relative w-full max-w-sm bg-gray-900 border border-white/10 rounded-3xl overflow-hidden shadow-2xl"
               style={{ maxHeight: '80vh' }}
             >
-              <div className="p-6 border-b border-white/5 flex items-center justify-between">
+              <div className="p-5 border-b border-white/5 flex items-center justify-between">
                 <h2 className="text-xl font-bold gold-text">Invite Friends</h2>
-                <button 
-                  onClick={() => setShowInviteModal(false)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 text-gray-400 hover:text-white transition-colors"
-                >
-                  ✕
-                </button>
+                <button onClick={() => setShowInviteModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 text-gray-400 hover:text-white transition-colors">✕</button>
               </div>
-              <div className="p-4 overflow-y-auto max-h-[60vh] custom-scrollbar">
+              <div className="p-4 overflow-y-auto" style={{ maxHeight: '60vh' }}>
                 <FriendsList />
               </div>
               <div className="p-4 bg-white/5 border-t border-white/5 text-center">
-                <p className="text-[10px] text-gray-500 uppercase tracking-widest">
+                <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
                   Players will receive an invite notification
                 </p>
               </div>

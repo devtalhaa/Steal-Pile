@@ -116,6 +116,8 @@ export interface ServerToClientEvents {
   'auth:success': () => void;
   'auth:error': (data: { message: string }) => void;
   'admin:kicked': () => void;
+  'room:kicked': () => void;
+  'room:dissolved': () => void;
   'game:lenter-lock': (message: string) => void;
 }
 
@@ -135,6 +137,7 @@ export interface ClientToServerEvents {
   ) => void;
   'room:leave': () => void;
   'room:add-bot': (data: { code: string }) => void;
+  'room:kick-player': (data: { targetId: string }) => void;
   'game:draw': () => void;
   'game:play-card': (data: { cardId: string }) => void;
   'game:next-round': () => void;

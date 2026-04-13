@@ -61,12 +61,14 @@ export class RoomManager {
     return { success: true };
   }
 
-  leaveRoom(playerId: string): { code: string; isEmpty: boolean; newHostId?: string } | null {
+  leaveRoom(playerId: string): { code: string; isEmpty: boolean; dissolved?: boolean } | null {
     const code = this.playerToRoom.get(playerId);
     if (!code) return null;
 
     const room = this.rooms.get(code);
     if (!room) return null;
+
+    const isHost = room.hostId === playerId;
 
     room.players.delete(playerId);
     this.playerToRoom.delete(playerId);
@@ -80,16 +82,33 @@ export class RoomManager {
       return { code, isEmpty: true };
     }
 
-    let newHostId: string | undefined;
-    if (room.hostId === playerId) {
-      newHostId = room.players.keys().next().value!;
-      room.hostId = newHostId;
+    if (isHost) {
+      for (const pid of room.players.keys()) {
+        this.playerToRoom.delete(pid);
+      }
+      this.rooms.delete(code);
+      return { code, isEmpty: true, dissolved: true };
     }
 
-    return { code, isEmpty: false, newHostId };
+    return { code, isEmpty: false };
   }
 
-  disconnectPlayer(playerId: string): { code: string; wasInGame: boolean } | null {
+  kickPlayer(code: string, hostId: string, targetId: string): { success: boolean; error?: string; isBot?: boolean } {
+    const room = this.rooms.get(code);
+    if (!room) return { success: false, error: 'Room not found' };
+    if (room.hostId !== hostId) return { success: false, error: 'Only host can kick' };
+    if (room.status !== 'lobby') return { success: false, error: 'Cannot kick during game' };
+    if (targetId === hostId) return { success: false, error: 'Cannot kick yourself' };
+    if (!room.players.has(targetId)) return { success: false, error: 'Player not in room' };
+
+    const isBot = room.players.get(targetId)?.isBot ?? false;
+    room.players.delete(targetId);
+    this.playerToRoom.delete(targetId);
+
+    return { success: true, isBot };
+  }
+
+  disconnectPlayer(playerId: string): { code: string; wasInGame: boolean; dissolved?: boolean } | null {
     const code = this.playerToRoom.get(playerId);
     if (!code) return null;
 
@@ -101,7 +120,9 @@ export class RoomManager {
       return { code, wasInGame: true };
     }
 
-    return this.leaveRoom(playerId) ? { code, wasInGame: false } : null;
+    const result = this.leaveRoom(playerId);
+    if (!result) return null;
+    return { code, wasInGame: false, dissolved: result.dissolved };
   }
 
   reconnectPlayer(code: string, playerName: string, newSocketId: string): { success: boolean; oldId?: string; error?: string } {

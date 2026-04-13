@@ -354,15 +354,34 @@ export function registerHandlers(io: Server, roomManager: RoomManager): void {
 
     socket.on('room:add-bot', (data: { code: string }) => {
       const code = roomManager.getRoomCodeByPlayerId(socket.id);
-      if (code !== data.code) return; // Only someone in the room can add a bot
+      if (code !== data.code) return;
       const room = roomManager.getRoomByCode(code);
-      if (room?.hostId !== socket.id) return; // Only host can add bots
+      if (room?.hostId !== socket.id) return;
 
       const result = roomManager.addBot(code);
       if (result.success) {
         const roomState = roomManager.getRoomState(code);
         if (roomState) io.to(code).emit('room:state', roomState);
       }
+    });
+
+    socket.on('room:kick-player', (data: { targetId: string }) => {
+      const code = roomManager.getRoomCodeByPlayerId(socket.id);
+      if (!code) return;
+
+      const result = roomManager.kickPlayer(code, socket.id, data.targetId);
+      if (!result.success) return;
+
+      if (!result.isBot) {
+        const targetSocket = io.sockets.sockets.get(data.targetId);
+        if (targetSocket) {
+          targetSocket.leave(code);
+          targetSocket.emit('room:kicked');
+        }
+      }
+
+      const roomState = roomManager.getRoomState(code);
+      if (roomState) io.to(code).emit('room:state', roomState);
     });
 
     socket.on('room:update-settings', (data: { settings: Partial<RoomSettings> }) => {
@@ -582,6 +601,11 @@ export function registerHandlers(io: Server, roomManager: RoomManager): void {
       const result = roomManager.disconnectPlayer(socket.id);
       if (!result) return;
 
+      if (result.dissolved) {
+        io.to(result.code).emit('room:dissolved');
+        return;
+      }
+
       if (result.wasInGame) {
         const room = roomManager.getRoomByCode(result.code);
         if (room && room.gameEngine) {
@@ -676,8 +700,13 @@ function handleLeave(socket: Socket, io: Server, roomManager: RoomManager): void
   const result = roomManager.leaveRoom(socket.id);
   if (!result) return;
 
-  const { code, isEmpty } = result;
+  const { code, isEmpty, dissolved } = result;
   socket.leave(code);
+
+  if (dissolved) {
+    io.to(code).emit('room:dissolved');
+    return;
+  }
 
   if (isEmpty) {
     return;

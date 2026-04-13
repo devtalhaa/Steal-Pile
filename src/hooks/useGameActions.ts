@@ -108,6 +108,11 @@ export function useGameActions() {
     }
   }, []);
 
+  const kickPlayer = useCallback((targetId: string) => {
+    const socket = getSocket();
+    socket.emit('room:kick-player', { targetId });
+  }, []);
+
   return {
     createRoom,
     joinRoom,
@@ -119,5 +124,6 @@ export function useGameActions() {
     playCard,
     requestNextRound,
     addBot,
+    kickPlayer,
   };
 }
