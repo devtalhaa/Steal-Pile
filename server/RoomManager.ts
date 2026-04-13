@@ -162,14 +162,13 @@ export class RoomManager {
     const room = this.rooms.get(code);
     if (!room || room.hostId !== playerId || room.status !== 'lobby') return false;
 
-    room.settings = { ...room.settings, ...settings };
+    const merged = { ...room.settings, ...settings };
 
-    // Validate team mode
-    if (room.settings.teamMode && room.players.size % 2 !== 0) {
-      // Don't apply team mode with odd players - but allow setting it
-      // Validation will happen at game start
+    if (merged.maxPlayers < room.players.size) {
+      merged.maxPlayers = room.players.size as RoomSettings['maxPlayers'];
     }
 
+    room.settings = merged;
     return true;
   }
 

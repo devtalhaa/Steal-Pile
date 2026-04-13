@@ -279,11 +279,51 @@ export function Lobby({ code }: LobbyProps) {
           </div>
         ) : (
           <div className="wr-section">
-            <div className="wr-chips-row">
-              <span className="wr-chip">🃏 {settings.deckCount === 1 ? '1 Deck' : '2 Decks'}</span>
-              <span className="wr-chip">👥 Max {settings.maxPlayers}</span>
+            <div className="wr-section-header">
+              <span className="wr-section-title">Game Settings</span>
+              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Host controls</span>
+            </div>
+            <div className="wr-settings-list">
+              <div className="wr-setting-row">
+                <span className="wr-setting-name">Deck Size</span>
+                <div className="wr-toggle-group">
+                  {([1, 2] as const).map(n => (
+                    <div key={n} className={`wr-toggle-opt ${settings.deckCount === n ? 'active' : ''}`} style={{ cursor: 'default', pointerEvents: 'none' }}>
+                      {n === 1 ? '1 Deck' : '2 Decks'}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="wr-setting-row">
+                <span className="wr-setting-name">Max Players</span>
+                <div className="wr-toggle-group">
+                  {[2, 3, 4, 5, 6, 7, 8].map(n => (
+                    <div key={n} className={`wr-toggle-opt wr-toggle-opt-sm ${settings.maxPlayers === n ? 'active' : ''}`} style={{ cursor: 'default', pointerEvents: 'none' }}>
+                      {n}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="wr-setting-row" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 12, marginTop: 4 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span className="wr-setting-name">Team Mode</span>
+                  {settings.teamMode && !hasEvenPlayers && (
+                    <span style={{ fontSize: 9, color: '#eab308', textTransform: 'uppercase', letterSpacing: '0.06em' }}>⚠ Need even players</span>
+                  )}
+                </div>
+                <div className={`lobby-toggle ${settings.teamMode ? 'on' : ''}`} style={{ pointerEvents: 'none', opacity: 0.75 }}>
+                  <span className="lobby-toggle-knob" />
+                </div>
+              </div>
               {settings.teamMode && (
-                <span className="wr-chip wr-chip-gold">⚔ Team Mode · {settings.targetScore} pts</span>
+                <div className="wr-setting-row">
+                  <span className="wr-setting-name">Target Score</span>
+                  <div className="wr-stepper">
+                    <div className="wr-stepper-btn" style={{ pointerEvents: 'none', opacity: 0.4 }}>−</div>
+                    <span className="wr-stepper-val gold-text">{settings.targetScore}</span>
+                    <div className="wr-stepper-btn" style={{ pointerEvents: 'none', opacity: 0.4 }}>+</div>
+                  </div>
+                </div>
               )}
             </div>
           </div>
